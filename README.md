@@ -16,7 +16,7 @@ VG Mayorista es el backend API microservicio para la plataforma de distribución
 
 ```
 src/main/java/com/distribuidora/
-├── GreenMarketApplication.java
+├── DistribuidoraApplication.java
 ├── config/                  # Seguridad (JWT), CORS y OpenAPI
 ├── controller/              # Endpoints REST (Products, Categories, Orders, Users, etc.)
 ├── dto/                     # Request y Response DTOs

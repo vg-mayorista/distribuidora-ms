@@ -6,10 +6,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @EnableScheduling
-public class GreenMarketApplication {
+public class DistribuidoraApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(GreenMarketApplication.class, args);
+		SpringApplication.run(DistribuidoraApplication.class, args);
 	}
 
 }

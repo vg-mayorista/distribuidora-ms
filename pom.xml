@@ -12,7 +12,7 @@
 	<artifactId>distribuidora</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>Distribuidora</name>
-	<description>Distribuidora application (fork of Green Market)</description>
+	<description>VG Mayorista Backend Microservice (distribuidora-ms)</description>
 	<url/>
 	<licenses>
 		<license/>
