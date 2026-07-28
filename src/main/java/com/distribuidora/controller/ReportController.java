@@ -22,8 +22,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/reports")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ROLE_ADMIN')")
-@Tag(name = "Reportes (Admin)", description = "Volumen, top productos/clientes, stock bajo, con export a CSV")
+@PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_DISTRIBUTOR')")
+@Tag(name = "Reportes", description = "Volumen, top productos/clientes, stock bajo, con export a CSV")
 public class ReportController {
 
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE;

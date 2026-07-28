@@ -37,7 +37,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     seedRoles();
     seedUsers();
     seedDeliveryMethods();
-    // seedCategoriesAndProducts();
+    seedCategoriesAndProducts();
   }
 
   private void seedRoles() {
