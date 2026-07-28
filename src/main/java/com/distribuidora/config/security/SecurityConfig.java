@@ -25,11 +25,13 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
   private final JwtAuthenticationFilter jwtAuthFilter;
+  private final RateLimitingFilter rateLimitingFilter;
   private final UserDetailsService userDetailsService;
   private final CorsConfig corsConfig;
 
-  public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, UserDetailsService userDetailsService, CorsConfig corsConfig) {
+  public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, RateLimitingFilter rateLimitingFilter, UserDetailsService userDetailsService, CorsConfig corsConfig) {
     this.jwtAuthFilter = jwtAuthFilter;
+    this.rateLimitingFilter = rateLimitingFilter;
     this.userDetailsService = userDetailsService;
     this.corsConfig = corsConfig;
   }
@@ -54,6 +56,7 @@ public class SecurityConfig {
             )
         )
         .authenticationProvider(authenticationProvider())
+        .addFilterBefore(rateLimitingFilter, JwtAuthenticationFilter.class)
         .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
