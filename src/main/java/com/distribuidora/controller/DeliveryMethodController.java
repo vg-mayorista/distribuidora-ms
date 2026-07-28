@@ -47,7 +47,7 @@ public class DeliveryMethodController {
     private final DeliveryMethodService service;
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_DISTRIBUTOR', 'ADMIN', 'DISTRIBUTOR')")
     @Operation(summary = "Crear método de entrega",
         description = "Registra un nuevo método de entrega en el sistema. El nombre debe ser único.")
     @ApiResponse(responseCode = "201", description = "Método de entrega creado exitosamente")
@@ -89,7 +89,7 @@ public class DeliveryMethodController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_DISTRIBUTOR', 'ADMIN', 'DISTRIBUTOR')")
     @Operation(summary = "Reemplazar método de entrega (PUT)",
         description = "Actualiza todos los atributos de un método de entrega existente.")
     @ApiResponse(responseCode = "200", description = "Método de entrega actualizado exitosamente")
@@ -104,7 +104,7 @@ public class DeliveryMethodController {
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_DISTRIBUTOR', 'ADMIN', 'DISTRIBUTOR')")
     @Operation(summary = "Actualizar parcialmente método de entrega (PATCH)",
         description = "Actualiza solo los campos proporcionados en la petición.")
     @ApiResponse(responseCode = "200", description = "Método de entrega actualizado exitosamente")
@@ -118,7 +118,7 @@ public class DeliveryMethodController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_DISTRIBUTOR', 'ADMIN', 'DISTRIBUTOR')")
     @Operation(summary = "Baja lógica de método de entrega (Soft Delete)",
         description = "Desactiva el método de entrega (active = false). Operación idempotente.")
     @ApiResponse(responseCode = "204", description = "Método de entrega desactivado exitosamente (idempotente)")
@@ -131,7 +131,7 @@ public class DeliveryMethodController {
     }
 
     @PatchMapping("/{id}/activate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_DISTRIBUTOR', 'ADMIN', 'DISTRIBUTOR')")
     @Operation(summary = "Reactivar método de entrega",
         description = "Vuelve a activar un método de entrega que había sido desactivado.")
     @ApiResponse(responseCode = "200", description = "Método de entrega reactivado exitosamente")
