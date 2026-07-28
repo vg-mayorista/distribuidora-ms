@@ -30,6 +30,7 @@ public class CorsConfig {
         config.setAllowedOriginPatterns(List.of(
             "http://localhost:*",           // Cualquier puerto localhost
             "http://127.0.0.1:*",           // Cualquier puerto 127.0.0.1
+            "https://*.vercel.app",          // Todos los subdominios de Vercel
             "https://*.serveo.net",          // Todos los subdominios serveo.net
             "https://*.serveousercontent.com", // Todos los serveousercontent.com
             "https://*.trycloudflare.com",   // Cloudflare Tunnel
