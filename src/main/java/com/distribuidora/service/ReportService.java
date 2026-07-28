@@ -143,6 +143,36 @@ public class ReportService {
             .toList();
     }
 
+    public SystemMetrics systemMetrics() {
+        long totalUsers = ((Number) entityManager.createQuery("SELECT COUNT(u) FROM User u").getSingleResult()).longValue();
+        long activeUsers = ((Number) entityManager.createQuery("SELECT COUNT(u) FROM User u WHERE u.active = true").getSingleResult()).longValue();
+        
+        long customerCount = ((Number) entityManager.createQuery("SELECT COUNT(u) FROM User u JOIN u.role r WHERE r.name = 'ROLE_CUSTOMER'").getSingleResult()).longValue();
+        long distributorCount = ((Number) entityManager.createQuery("SELECT COUNT(u) FROM User u JOIN u.role r WHERE r.name = 'ROLE_DISTRIBUTOR'").getSingleResult()).longValue();
+        long adminCount = ((Number) entityManager.createQuery("SELECT COUNT(u) FROM User u JOIN u.role r WHERE r.name = 'ROLE_ADMIN'").getSingleResult()).longValue();
+
+        long totalProducts = ((Number) entityManager.createQuery("SELECT COUNT(p) FROM Product p").getSingleResult()).longValue();
+        long activeProducts = ((Number) entityManager.createQuery("SELECT COUNT(p) FROM Product p WHERE p.active = true").getSingleResult()).longValue();
+
+        long totalOrders = ((Number) entityManager.createQuery("SELECT COUNT(o) FROM Order o").getSingleResult()).longValue();
+        long activeDeliveryMethods = ((Number) entityManager.createQuery("SELECT COUNT(d) FROM DeliveryMethod d WHERE d.active = true").getSingleResult()).longValue();
+
+        return new SystemMetrics(
+            totalUsers,
+            activeUsers,
+            customerCount,
+            distributorCount,
+            adminCount,
+            totalProducts,
+            activeProducts,
+            totalOrders,
+            activeDeliveryMethods,
+            "ONLINE (UP)",
+            "PostgreSQL 16",
+            "Bucket4j (120 req/min API / 10 req/min Auth)"
+        );
+    }
+
     /**
      * Some databases (notably H2) return SUM/AVG as Double; PostgreSQL returns BigDecimal.
      * Normalize to BigDecimal so the API contract is the same.
@@ -153,6 +183,21 @@ public class ReportService {
         if (value instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
         return new BigDecimal(value.toString());
     }
+
+    public record SystemMetrics(
+            long totalUsers,
+            long activeUsers,
+            long customerCount,
+            long distributorCount,
+            long adminCount,
+            long totalProducts,
+            long activeProducts,
+            long totalOrders,
+            long activeDeliveryMethods,
+            String systemStatus,
+            String databaseEngine,
+            String rateLimiterProtection
+    ) {}
 
     public record VolumeAndTicket(
             long deliveredCount,

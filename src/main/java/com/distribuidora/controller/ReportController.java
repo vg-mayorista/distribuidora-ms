@@ -30,6 +30,12 @@ public class ReportController {
 
     private final ReportService service;
 
+    @GetMapping("/system-metrics")
+    @Operation(summary = "Métricas de uso e infraestructura del sistema (Admin IT)")
+    public ReportService.SystemMetrics systemMetrics() {
+        return service.systemMetrics();
+    }
+
     @GetMapping("/volume")
     @Operation(summary = "Volumen y ticket promedio (órdenes ENTREGADO)")
     public ReportService.VolumeAndTicket volume(
