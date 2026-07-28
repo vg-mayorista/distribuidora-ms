@@ -16,10 +16,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class JwtService {
 
-    @Value("${greenmarket.security.jwt.secret:djl5JEImRSllTWNRZlRqV21acTR0N3chZiVDKkYtSmFOZFJnVWtYcDJyNXV4L0E/RCgrS2JQZVNoVm1ZcQ==}")
+    @Value("${distribuidora.security.jwt.secret:${greenmarket.security.jwt.secret:djl5JEImRSllTWNRZlRqV21acTR0N3chZiVDKkYtSmFOZFJnVWtYcDJyNXV4L0E/RCgrS2JQZVNoVm1ZcQ==}}}")
     private String secretKey;
 
-    @Value("${greenmarket.security.jwt.expiration:86400000}") // 24 hours in ms
+    @Value("${distribuidora.security.jwt.expiration:${greenmarket.security.jwt.expiration:86400000}}") // 24 hours in ms
     private long jwtExpiration;
 
     public String extractUsername(String token) {

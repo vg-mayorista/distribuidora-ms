@@ -1,39 +1,31 @@
-# Green Market
+# VG Mayorista (Backend API)
 
-Green Market es un catálogo de productos **orgánicos** con vencimiento por lotes. Expone el **ABM (Alta / Baja / Modificación)** de `Product` sobre REST, con Postgres como base de datos, IDs UUID v4, paginación, uniqueness por nombre y tests E2E + unitarios contra Testcontainers.
+VG Mayorista es el backend API microservicio para la plataforma de distribución mayorista. Expone la gestión de productos, categorías, pedidos, clientes y reportes sobre REST, con Postgres como base de datos, IDs UUID v4, paginación y seguridad JWT.
 
 ## Stack
 
 - Java 21 (LTS)
-- Spring Boot 4.1.0 (MVC + Data JPA + Validation)
-- PostgreSQL 16 (vía Docker Compose en local, vía Testcontainers en tests)
-- JPA / Hibernate con `ddl-auto=update` (sin migraciones todavía)
+- Spring Boot 4.1.0 (MVC + Data JPA + Security + Validation)
+- PostgreSQL 16 (vía Docker Compose en local)
+- JPA / Hibernate con `ddl-auto=update`
 - Lombok
 - UUID v4 como identificador (Hibernate `GenerationType.UUID`)
-- Testcontainers + RestClient para tests E2E
-- Mockito + AssertJ para tests unitarios
+- Spring Security + JWT para autenticación y autorización por roles (`ROLE_CUSTOMER`, `ROLE_DISTRIBUTOR`, `ROLE_ADMIN`)
 
 ## Estructura
 
 ```
-src/main/java/com/greenmarket/
+src/main/java/com/distribuidora/
 ├── GreenMarketApplication.java
-├── exception/
-│   ├── ProductNotFoundException.java   # domain 404
-│   ├── DuplicateProductException.java    # domain 409
-│   └── GlobalExceptionHandler.java       # @ControllerAdvice → ProblemDetail
-└── product/
-    ├── Product.java                 # entity (aggregate root, UUID id)
-    ├── ProductRepository.java       # Spring Data JPA + uniqueness queries
-    ├── ProductService.java          # business logic (ABM + patch + uniqueness)
-    ├── ProductController.java       # REST + pagination
-    ├── dto/
-    │   ├── CreateProductRequest.java
-    │   ├── UpdateProductRequest.java
-    │   ├── PatchProductRequest.java
-    │   └── ProductResponse.java
-    └── mapper/
-        └── ProductMapper.java
+├── config/                  # Seguridad (JWT), CORS y OpenAPI
+├── controller/              # Endpoints REST (Products, Categories, Orders, Users, etc.)
+├── dto/                     # Request y Response DTOs
+├── exception/               # GlobalExceptionHandler y excepciones de dominio
+├── mapper/                  # Mapeadores de entidades a DTOs
+├── model/                   # Entidades JPA (User, Product, Category, Order, DeliveryMethod, etc.)
+├── repository/              # Repositorios Spring Data JPA
+├── seeder/                  # Carga de datos iniciales
+└── service/                 # Lógica de negocio
 ```
 
 Los errores de dominio (404, 409) se mapean vía custom exceptions + `@ControllerAdvice` como RFC 7807 `ProblemDetail`. Los 400 (validación) los maneja el handler default de Spring.
@@ -42,7 +34,7 @@ Los errores de dominio (404, 409) se mapean vía custom exceptions + `@Controlle
 
 - Java 21 (`java -version`)
 - Maven 3.9+ o usar el wrapper (`./mvnw`)
-- Docker + Docker Compose (para Postgres local y para los tests E2E)
+- Docker + Docker Compose (para Postgres local)
 - `curl` y `jq` (opcional pero recomendado para las pruebas)
 
 ## Levantar la base de datos
@@ -51,7 +43,7 @@ Los errores de dominio (404, 409) se mapean vía custom exceptions + `@Controlle
 docker compose up -d
 ```
 
-Postgres queda en `localhost:5433` con DB/user/password `greenmarket/greenmarket/greenmarket` (configurable vía env vars `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`).
+Postgres queda en `localhost:5433` con DB/user/password `distribuidora/distribuidora/distribuidora` (configurable vía env vars `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`).
 
 Para parar y borrar el volumen:
 
@@ -131,7 +123,7 @@ Ejemplo: `GET /api/products?page=0&size=10&sort=name,asc`
 }
 ```
 
-Todos los productos son orgánicos por definición (es Green Market), no hay flag para eso. `active=false` significa soft delete — la fila queda en la tabla pero no se lista ni se devuelve por GET por id. `createdAt` y `updatedAt` los maneja JPA, no se aceptan en los request bodies.
+`active=false` significa soft delete — la fila queda en la tabla pero no se lista ni se devuelve por GET por id. `createdAt` y `updatedAt` los maneja JPA, no se aceptan en los request bodies.
 
 ### Respuesta paginada
 

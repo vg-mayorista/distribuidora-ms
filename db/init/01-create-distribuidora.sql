@@ -3,9 +3,6 @@
 -- Se ejecuta UNA SOLA VEZ cuando el volumen del postgres se inicializa por
 -- primera vez (ver docker-entrypoint-initdb.d de la imagen oficial).
 -- Es idempotente: si ya existe el rol/db no rompe.
---
--- Si venís de la versión vieja (greenmarket-postgres), este script no se ejecuta
--- automáticamente. Usá el script setup-db.ps1 o leé db/README.md.
 -- =============================================================================
 
 -- Si el rol distribuidora no existe, lo creamos. Si existe, lo modificamos

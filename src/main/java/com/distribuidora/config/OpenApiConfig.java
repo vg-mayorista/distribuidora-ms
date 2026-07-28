@@ -20,12 +20,12 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
     @Bean
-    public OpenAPI greenMarketOpenApi() {
+    public OpenAPI vgMayoristaOpenApi() {
         final String securitySchemeName = "bearerAuth";
         return new OpenAPI()
                 .info(new Info()
-                        .title("Green Market API")
-                        .description("API REST para el catálogo de productos orgánicos con vencimiento por lotes de Green Market.")
+                        .title("VG Mayorista API")
+                        .description("API REST para la gestión de catálogo, pedidos y distribución mayorista de VG Mayorista.")
                         .version("v1.0.0"))
                 .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
                 .components(new Components()

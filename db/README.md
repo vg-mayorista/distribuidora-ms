@@ -26,9 +26,9 @@ cd ..
 
 Las podés cambiar vía `.env` (copia `env.example`) o pasando las env vars `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` al backend.
 
-## Migración desde `greenmarket-postgres` (versión vieja)
+## Migración desde contenedores antiguos
 
-Si ya tenés el container viejo del fork de green-market con credenciales `greenmarket/greenmarket/greenmarket`:
+Si tenés un contenedor viejo con credenciales antiguas (`greenmarket/greenmarket/greenmarket`):
 
 ```powershell
 # Migrá las credenciales sin perder datos

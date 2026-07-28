@@ -1,4 +1,4 @@
-# Seguimiento por Lotes (Green Market)
+# Seguimiento por Lotes (VG Mayorista)
 
 Diseño técnico y decisiones de arquitectura para implementar la gestión de inventario por lotes (`Batch`) con rotación FEFO, trazabilidad de proveedores y consistencia transaccional.
 
@@ -6,7 +6,7 @@ Diseño técnico y decisiones de arquitectura para implementar la gestión de in
 
 ## 1. Definición del Problema y Contexto
 
-El catálogo de Green Market maneja productos orgánicos perecederos. Gestionar el inventario como un valor global acumulado en la tabla de productos (`Product.stock`) presenta deficiencias operativas y sanitarias graves:
+El catálogo de VG Mayorista maneja productos perecederos. Gestionar el inventario como un valor global acumulado en la tabla de productos (`Product.stock`) presenta deficiencias operativas y sanitarias graves:
 * **Riesgo Sanitario y de Merma:** Sin trazabilidad de fechas de vencimiento, se pueden vender productos caducados o desperdiciar stock por mala rotación.
 * **Inviabilidad de FEFO:** La venta no puede priorizar automáticamente las existencias más próximas a vencer.
 * **Falta de Trazabilidad:** Ante problemas de calidad con un lote de un proveedor específico, no es posible hacer un retiro dirigido (recall) de las existencias afectadas.
@@ -121,7 +121,7 @@ Se implementará un servicio de inventario (`InventoryService`) anotado con `@Ca
 * **Pros:** Consistencia del 100% entre góndola física y base de datos lógica.
 * **Cons:** Mayor costo operativo (impresión y etiquetado unitario) y tiempos de checkout más lentos.
 
-**Decisión para Green Market:** Para esta fase del sistema, adoptaremos el Enfoque 1 (FEFO Lógico) por su simplicidad operativa, asumiendo auditorías de inventario manuales periódicas para ajustar desviaciones en los saldos específicos de cada lote.
+**Decisión para VG Mayorista:** Para esta fase del sistema, adoptaremos el Enfoque 1 (FEFO Lógico) por su simplicidad operativa, asumiendo auditorías de inventario manuales periódicas para ajustar desviaciones en los saldos específicos de cada lote.
 
 ---
 
@@ -153,30 +153,30 @@ Para resolver la desviación fina (ej: cuando el cliente se lleva el producto de
 
 ### Modificaciones en el Dominio y Modelo
 
-#### [MODIFY] [Product.java](file:///d:/programacion/green-market/src/main/java/com/greenmarket/model/Product.java)
+#### [MODIFY] [Product.java](file:///d:/programacion/distribuidora/src/main/java/com/distribuidora/model/Product.java)
 * Eliminar el atributo `@NotNull @Min(0) private Integer stock;` y sus getters/setters.
 
-#### [NEW] [Batch.java](file:///d:/programacion/green-market/src/main/java/com/greenmarket/model/Batch.java)
+#### [NEW] [Batch.java](file:///d:/programacion/distribuidora/src/main/java/com/distribuidora/model/Batch.java)
 * Nueva entidad JPA para la tabla `batches`.
 * Atributos: `id`, `productId`, `supplierId`, `batchNumber`, `quantity`, `acquisitionDate`, `expiryDate`, `status` (Enum: `BatchStatus`), `createdAt`, `updatedAt`.
 
-#### [NEW] [BatchStatus.java](file:///d:/programacion/green-market/src/main/java/com/greenmarket/model/BatchStatus.java)
+#### [NEW] [BatchStatus.java](file:///d:/programacion/distribuidora/src/main/java/com/distribuidora/model/BatchStatus.java)
 * Enum con los estados: `ACTIVE`, `EXPIRED`, `DEPLETED`.
 
 ---
 
 ### Modificaciones en la Capa de Datos (Repositories)
 
-#### [NEW] [BatchRepository.java](file:///d:/programacion/green-market/src/main/java/com/greenmarket/repository/BatchRepository.java)
+#### [NEW] [BatchRepository.java](file:///d:/programacion/distribuidora/src/main/java/com/distribuidora/repository/BatchRepository.java)
 * Interfaz `JpaRepository<Batch, UUID>`.
 * **Mapeo SARGable**: Evitamos usar funciones de base de datos (`CURRENT_TIMESTAMP`) en el query dinámico, pasando la fecha actual como parámetro (`Instant now`).
 * **Bloqueo Pesimista**: Previene condiciones de carrera al descontar inventario en checkout concurrentes.
 
 ```java
-package com.greenmarket.repository;
+package com.distribuidora.repository;
 
-import com.greenmarket.model.Batch;
-import com.greenmarket.model.BatchStatus;
+import com.distribuidora.model.Batch;
+import com.distribuidora.model.BatchStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -208,22 +208,22 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
 
 ### Modificaciones en la Capa de Servicios y Schedulers
 
-#### [NEW] [InventoryService.java](file:///d:/programacion/green-market/src/main/java/com/greenmarket/service/InventoryService.java)
+#### [NEW] [InventoryService.java](file:///d:/programacion/distribuidora/src/main/java/com/distribuidora/service/InventoryService.java)
 * Gestiona el stock dinámico e implementa la lógica FEFO y el control de caché:
   * `Integer getAvailableStock(UUID productId)` -> Llama a `sumAvailableStockByProductId` y se marca con `@Cacheable`.
   * `void consumeStockFEFO(UUID productId, Integer quantity)` -> Llama a `findActiveBatchesForWriteFEFO` dentro de una transacción `@Transactional`, realiza el descuento cascada, actualiza los registros a `DEPLETED` e invalida el caché usando `@CacheEvict`.
 
-#### [NEW] [BatchExpirationJob.java](file:///d:/programacion/green-market/src/main/java/com/greenmarket/service/scheduler/BatchExpirationJob.java)
+#### [NEW] [BatchExpirationJob.java](file:///d:/programacion/distribuidora/src/main/java/com/distribuidora/service/scheduler/BatchExpirationJob.java)
 * Tarea programada (Spring `@Scheduled` o Quartz) que corre diariamente (ej: `0 1 0 * * *` - 00:01 AM).
 * **Propósito**: Busca lotes en estado `ACTIVE` donde `expiryDate` sea menor a la hora actual, actualiza su estado a `EXPIRED`, invalida el caché y realiza Calentamiento de Caché (Cache Warming) para evitar picos de carga (Cache Stampede).
 
 ```java
-package com.greenmarket.service.scheduler;
+package com.distribuidora.service.scheduler;
 
-import com.greenmarket.model.Batch;
-import com.greenmarket.model.BatchStatus;
-import com.greenmarket.repository.BatchRepository;
-import com.greenmarket.service.InventoryService;
+import com.distribuidora.model.Batch;
+import com.distribuidora.model.BatchStatus;
+import com.distribuidora.repository.BatchRepository;
+import com.distribuidora.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
@@ -280,7 +280,7 @@ public class BatchExpirationJob {
 }
 ```
 
-#### [MODIFY] [CartService.java](file:///d:/programacion/green-market/src/main/java/com/greenmarket/service/CartService.java)
+#### [MODIFY] [CartService.java](file:///d:/programacion/distribuidora/src/main/java/com/distribuidora/service/CartService.java)
 * Modificar `validateAllItems` y `decrementStock` para integrarlos con `InventoryService`.
 * Separar la confirmación del stock en una transacción independiente y proveer la lógica de compensación/devolución en caso de que el cobro asíncrono falle.
 
@@ -288,12 +288,12 @@ public class BatchExpirationJob {
 
 ### Modificaciones en la Configuración
 
-#### [NEW] [CacheConfig.java](file:///d:/programacion/green-market/src/main/java/com/greenmarket/config/CacheConfig.java)
+#### [NEW] [CacheConfig.java](file:///d:/programacion/distribuidora/src/main/java/com/distribuidora/config/CacheConfig.java)
 * Habilita `@EnableCaching`.
 * Registra el `CacheManager` configurando Caffeine con un TTL de fallback de seguridad (ej. 15 minutos).
 
 ```java
-package com.greenmarket.config;
+package com.distribuidora.config;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.cache.CacheManager;
