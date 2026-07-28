@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: distribuidora-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-distribuidora}
+      POSTGRES_USER: ${POSTGRES_USER:-distribuidora}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-distribuidora}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - distribuidora_pgdata:/var/lib/postgresql/data
+      # Los scripts en ./db/init se ejecutan UNA SOLA VEZ en el primer arranque
+      # del volumen (cuando se inicializa el cluster). Son idempotentes.
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-distribuidora} -d ${POSTGRES_DB:-distribuidora}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  distribuidora_pgdata:
+    name: distribuidora_pgdata
