@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 
 /**
- * Fallback CORS filter that runs before Spring Security.
- * This ensures CORS headers are set on ALL responses.
+ * Fallback CORS filter that runs before Spring Security at HIGHEST_PRECEDENCE.
+ * Ensures CORS headers are set on ALL responses including preflight OPTIONS.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -25,28 +25,21 @@ public class CorsFilter implements Filter {
         HttpServletRequest request = (HttpServletRequest) req;
 
         String origin = request.getHeader("Origin");
-        
-        // Allow localhost and serveo/ngrok domains
-        if (origin == null || origin.contains("localhost")
-            || origin.contains("serveo.net") || origin.contains("serveousercontent.com")
-            || origin.contains("ngrok-free.app") || origin.contains("ngrok-free.dev")
-            || origin.contains("ngrok.io") || origin.contains("trycloudflare.com")) {
 
-            if (origin == null) {
-                // Wildcard origin is incompatible with credentials
-                response.setHeader("Access-Control-Allow-Origin", "*");
-            } else {
-                response.setHeader("Access-Control-Allow-Origin", origin);
-                response.setHeader("Access-Control-Allow-Credentials", "true");
-            }
-            
+        if (origin != null && !origin.isEmpty()) {
+            response.setHeader("Access-Control-Allow-Origin", origin);
+            response.setHeader("Access-Control-Allow-Credentials", "true");
             response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
             response.setHeader("Access-Control-Allow-Headers", 
-                "Content-Type, Authorization, X-Requested-With, Accept, Origin");
+                "Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers");
             response.setHeader("Access-Control-Max-Age", "3600");
+        } else {
+            response.setHeader("Access-Control-Allow-Origin", "*");
+            response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+            response.setHeader("Access-Control-Allow-Headers", "*");
         }
 
-        // Handle preflight requests
+        // Handle preflight OPTIONS requests immediately
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             response.setStatus(HttpServletResponse.SC_OK);
             return;
