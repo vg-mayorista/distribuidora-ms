@@ -131,7 +131,7 @@ public class OrderService {
             int unitsPerPack = p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1 ? p.getUnitsPerPack() : 1;
             int packs = itemReq.quantity();
             int physicalUnits = packs * unitsPerPack;
-            BigDecimal itemSubtotal = p.getPrice().multiply(BigDecimal.valueOf(physicalUnits));
+            BigDecimal itemSubtotal = p.getPrice().multiply(BigDecimal.valueOf(packs));
 
             OrderItem oi = OrderItem.builder()
                     .productId(p.getId())
@@ -205,7 +205,7 @@ public class OrderService {
             int unitsPerPack = p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1 ? p.getUnitsPerPack() : 1;
             int packs = itemReq.quantity();
             int physicalUnits = packs * unitsPerPack;
-            BigDecimal itemSubtotal = p.getPrice().multiply(BigDecimal.valueOf(physicalUnits));
+            BigDecimal itemSubtotal = p.getPrice().multiply(BigDecimal.valueOf(packs));
 
             OrderItem oi = OrderItem.builder()
                     .productId(p.getId())

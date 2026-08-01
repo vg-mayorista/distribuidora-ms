@@ -96,10 +96,10 @@ class ReportServiceIntegrationTest {
         ReportService.VolumeAndTicket v = reportService.volumeAndTicket(null, null);
 
         assertThat(v.deliveredCount()).isEqualTo(2);
-        // order 1: 2 packs × 10 = 20 units × 1000 = 20000 + delivery 100 = 20100
-        // order 2: 5 × 500 = 2500 + delivery 100 = 2600
-        assertThat(v.deliveredRevenue()).isEqualByComparingTo("22700.00");
-        assertThat(v.avgTicket()).isEqualByComparingTo("11350.00");
+        // order 1: 2 packs × 1000 = 2000 + delivery 100 = 2100
+        // order 2: 5 packs × 500 = 2500 + delivery 100 = 2600
+        assertThat(v.deliveredRevenue()).isEqualByComparingTo("4700.00");
+        assertThat(v.avgTicket()).isEqualByComparingTo("2350.00");
     }
 
     @Test

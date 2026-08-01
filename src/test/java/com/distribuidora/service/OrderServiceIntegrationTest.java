@@ -93,9 +93,9 @@ class OrderServiceIntegrationTest {
         assertThat(response.items()).hasSize(1);
         assertThat(response.items().get(0).packsRequested()).isEqualTo(2);
         assertThat(response.items().get(0).quantity()).isEqualTo(20); // physical units
-        assertThat(response.subtotal()).isEqualByComparingTo("20000.00");  // 20 × 1000
+        assertThat(response.subtotal()).isEqualByComparingTo("2000.00");   // 2 packs × 1000
         assertThat(response.deliveryCost()).isEqualByComparingTo("500");
-        assertThat(response.total()).isEqualByComparingTo("20500.00");
+        assertThat(response.total()).isEqualByComparingTo("2500.00");
         assertThat(response.editable()).isTrue();
     }
 
