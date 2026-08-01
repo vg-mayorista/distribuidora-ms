@@ -100,17 +100,13 @@ class OrderServiceIntegrationTest {
     }
 
     @Test
-    void transitionToArmadoDecrementsStock() {
+    void createOrderDecrementsStock() {
+        int stockBefore = productRepository.findById(productId).orElseThrow().getStock();
         OrderResponse created = orderService.create(customerId, new CreateOrderRequest(
                 deliveryMethodId, LocalDate.now().plusDays(2), null, null, null,
                 List.of(item(productId, 3))   // 30 unidades
         ));
-        int stockBefore = productRepository.findById(productId).orElseThrow().getStock();
 
-        OrderResponse armado = orderService.transitionStatus(created.id(),
-                new UpdateOrderStatusRequest(OrderStatus.ARMADO, null));
-
-        assertThat(armado.status()).isEqualTo(OrderStatus.ARMADO);
         int stockAfter = productRepository.findById(productId).orElseThrow().getStock();
         assertThat(stockAfter).isEqualTo(stockBefore - 30);
     }
@@ -129,19 +125,20 @@ class OrderServiceIntegrationTest {
 
     @Test
     void cancelarArmadoRestauraStock() {
+        int initialStock = productRepository.findById(productId).orElseThrow().getStock();
         OrderResponse created = orderService.create(customerId, new CreateOrderRequest(
                 deliveryMethodId, LocalDate.now().plusDays(2), null, null, null,
                 List.of(item(productId, 3))
         ));
-        orderService.transitionStatus(created.id(), new UpdateOrderStatusRequest(OrderStatus.ARMADO, null));
-        int stockArmado = productRepository.findById(productId).orElseThrow().getStock();
+        int stockCreated = productRepository.findById(productId).orElseThrow().getStock();
+        assertThat(stockCreated).isEqualTo(initialStock - 30);
 
         OrderResponse cancelado = orderService.transitionStatus(created.id(),
                 new UpdateOrderStatusRequest(OrderStatus.CANCELADO, "sin stock"));
 
         assertThat(cancelado.status()).isEqualTo(OrderStatus.CANCELADO);
         int stockCancelado = productRepository.findById(productId).orElseThrow().getStock();
-        assertThat(stockCancelado).isEqualTo(stockArmado + 30);
+        assertThat(stockCancelado).isEqualTo(initialStock);
         assertThat(cancelado.notes()).contains("sin stock");
     }
 

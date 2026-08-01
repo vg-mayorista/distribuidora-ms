@@ -151,6 +151,9 @@ public class OrderService {
         order.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
         order.setTotal(total.setScale(2, RoundingMode.HALF_UP));
 
+        decrementStockForOrder(order);
+        order.setStockDecremented(Boolean.TRUE);
+
         Order saved = orderRepository.save(order);
         return toResponse(saved);
     }
@@ -166,6 +169,11 @@ public class OrderService {
         if (req.deliveryMethodId() != null) {
             dm = deliveryMethodRepository.findByIdAndActiveTrue(req.deliveryMethodId())
                     .orElseThrow(() -> new DeliveryMethodNotFoundException(req.deliveryMethodId()));
+        }
+
+        if (Boolean.TRUE.equals(order.getStockDecremented())) {
+            restoreStockForOrder(order);
+            order.setStockDecremented(Boolean.FALSE);
         }
 
         Map<UUID, Integer> originalItemsByProduct = new HashMap<>();
@@ -234,6 +242,9 @@ public class OrderService {
         BigDecimal total = subtotal.add(order.getDeliveryCost());
         order.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
         order.setTotal(total.setScale(2, RoundingMode.HALF_UP));
+
+        decrementStockForOrder(order);
+        order.setStockDecremented(Boolean.TRUE);
 
         return toResponse(order);
     }
