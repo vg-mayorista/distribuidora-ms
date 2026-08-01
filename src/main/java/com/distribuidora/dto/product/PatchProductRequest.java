@@ -24,6 +24,9 @@ public record PatchProductRequest(
         Integer stock,
 
         @Schema(description = "Unidades físicas por pack (null = no cambia, debe ser >= 1)", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
-        Integer unitsPerPack
+        Integer unitsPerPack,
+
+        @Schema(description = "Nuevo umbral de stock bajo (null = no cambia, debe ser >= 0)", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        Integer lowStockThreshold
 ) {
 }

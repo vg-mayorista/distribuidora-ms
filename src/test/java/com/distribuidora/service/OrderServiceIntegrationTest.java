@@ -3,6 +3,7 @@ package com.distribuidora.service;
 import com.distribuidora.dto.order.CreateOrderRequest;
 import com.distribuidora.dto.order.OrderResponse;
 import com.distribuidora.dto.order.UpdateOrderStatusRequest;
+import com.distribuidora.exception.InsufficientStockException;
 import com.distribuidora.exception.OrderInvalidTransitionException;
 import com.distribuidora.exception.OrderNotFoundException;
 import com.distribuidora.model.*;
@@ -165,5 +166,43 @@ class OrderServiceIntegrationTest {
     void getNotFoundThrows() {
         assertThatThrownBy(() -> orderService.get(UUID.randomUUID()))
             .isInstanceOf(OrderNotFoundException.class);
+    }
+
+    @Test
+    void createOrderRejectsInsufficientStock() {
+        Product small = productRepository.save(Product.builder()
+                .name("StockBajo")
+                .description("d")
+                .price(new BigDecimal("100"))
+                .stock(5)
+                .unitsPerPack(1)
+                .active(true)
+                .build());
+
+        assertThatThrownBy(() -> orderService.create(customerId, new CreateOrderRequest(
+                deliveryMethodId,
+                LocalDate.now().plusDays(2),
+                null, null, null,
+                List.of(item(small.getId(), 10))
+        )))
+            .isInstanceOf(InsufficientStockException.class)
+            .satisfies(ex -> {
+                InsufficientStockException ise = (InsufficientStockException) ex;
+                assertThat(ise.getItems()).hasSize(1);
+                assertThat(ise.getItems().get(0).available()).isEqualTo(5);
+                assertThat(ise.getItems().get(0).requested()).isEqualTo(10);
+            });
+    }
+
+    @Test
+    void createOrderAcceptsWhenStockIsEnough() {
+        OrderResponse response = orderService.create(customerId, new CreateOrderRequest(
+                deliveryMethodId,
+                LocalDate.now().plusDays(2),
+                null, null, null,
+                List.of(item(productId, 5))
+        ));
+
+        assertThat(response.status()).isEqualTo(OrderStatus.PENDIENTE);
     }
 }

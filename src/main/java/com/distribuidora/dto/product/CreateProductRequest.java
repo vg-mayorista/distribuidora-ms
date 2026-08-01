@@ -40,6 +40,10 @@ public record CreateProductRequest(
 
         @Schema(description = "Unidades físicas que contiene cada pack/caja (default 1 = unitario)", example = "12", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @Min(1)
-        Integer unitsPerPack
+        Integer unitsPerPack,
+
+        @Schema(description = "Umbral de unidades físicas por debajo del cual el producto se considera 'Stock bajo'. Si es null, se usa el default global.", example = "20", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Min(0)
+        Integer lowStockThreshold
 ) {
 }

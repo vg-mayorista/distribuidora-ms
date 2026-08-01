@@ -1,5 +1,7 @@
 package com.distribuidora.service;
 
+import com.distribuidora.config.StockProperties;
+import com.distribuidora.dto.product.StockStatus;
 import com.distribuidora.model.Product;
 import com.distribuidora.repository.ProductRepository;
 import com.distribuidora.repository.CategoryRepository;
@@ -47,6 +49,9 @@ class ProductServiceTest {
     @Mock
     CategoryRepository categoryRepository;
 
+    @Mock
+    StockProperties stockProperties;
+
     @InjectMocks
     ProductService service;
 
@@ -71,7 +76,7 @@ class ProductServiceTest {
     class Create {
         @Test
         void createsProductSuccessfully() {
-            CreateProductRequest req = new CreateProductRequest(CATEGORY_ID, null, "Manzana", "desc", new BigDecimal("100.00"), 10, 12);
+            CreateProductRequest req = new CreateProductRequest(CATEGORY_ID, null, "Manzana", "desc", new BigDecimal("100.00"), 10, 12, null);
             Product entity = activeProduct();
 
             when(categoryRepository.existsByIdAndActiveTrue(CATEGORY_ID)).thenReturn(true);
@@ -87,7 +92,7 @@ class ProductServiceTest {
 
         @Test
         void throwsDuplicateWhenNameExists() {
-            CreateProductRequest req = new CreateProductRequest(CATEGORY_ID, null, "Manzana", "desc", new BigDecimal("100.00"), 10, 12);
+            CreateProductRequest req = new CreateProductRequest(CATEGORY_ID, null, "Manzana", "desc", new BigDecimal("100.00"), 10, 12, null);
 
             when(categoryRepository.existsByIdAndActiveTrue(CATEGORY_ID)).thenReturn(true);
             when(repository.existsByName("Manzana")).thenReturn(true);
@@ -101,7 +106,7 @@ class ProductServiceTest {
 
         @Test
         void throwsCategoryNotFoundWhenCategoryDoesNotExist() {
-            CreateProductRequest req = new CreateProductRequest(NONEXISTENT_CATEGORY_ID, null, "Valid", "desc", new BigDecimal("100.00"), 10, 12);
+            CreateProductRequest req = new CreateProductRequest(NONEXISTENT_CATEGORY_ID, null, "Valid", "desc", new BigDecimal("100.00"), 10, 12, null);
 
             when(categoryRepository.existsByIdAndActiveTrue(NONEXISTENT_CATEGORY_ID)).thenReturn(false);
 
@@ -151,7 +156,7 @@ class ProductServiceTest {
         @Test
         void updatesProductSuccessfully() {
             Product p = activeProduct();
-            UpdateProductRequest req = new UpdateProductRequest(CATEGORY_ID, null, "Lechuga", "", new BigDecimal("50.00"), 5, 12);
+            UpdateProductRequest req = new UpdateProductRequest(CATEGORY_ID, null, "Lechuga", "", new BigDecimal("50.00"), 5, 12, 20);
 
             when(repository.findByIdAndActiveTrue(ID)).thenReturn(Optional.of(p));
             when(categoryRepository.existsByIdAndActiveTrue(CATEGORY_ID)).thenReturn(true);
@@ -168,7 +173,7 @@ class ProductServiceTest {
 
         @Test
         void throwsNotFoundWhenMissing() {
-            UpdateProductRequest req = new UpdateProductRequest(CATEGORY_ID, null, "x", "", new BigDecimal("1"), 1, 1);
+            UpdateProductRequest req = new UpdateProductRequest(CATEGORY_ID, null, "x", "", new BigDecimal("1"), 1, 1, 20);
 
             when(repository.findByIdAndActiveTrue(ID)).thenReturn(Optional.empty());
 
@@ -179,7 +184,7 @@ class ProductServiceTest {
         @Test
         void throwsDuplicateWhenNameConflicts() {
             Product p = activeProduct();
-            UpdateProductRequest req = new UpdateProductRequest(CATEGORY_ID, null, "Tomate", "", new BigDecimal("50.00"), 5, 1);
+            UpdateProductRequest req = new UpdateProductRequest(CATEGORY_ID, null, "Tomate", "", new BigDecimal("50.00"), 5, 1, 20);
 
             when(repository.findByIdAndActiveTrue(ID)).thenReturn(Optional.of(p));
             when(categoryRepository.existsByIdAndActiveTrue(CATEGORY_ID)).thenReturn(true);
@@ -196,7 +201,7 @@ class ProductServiceTest {
         @Test
         void patchesSingleField() {
             Product p = activeProduct();
-            PatchProductRequest req = new PatchProductRequest(null, null, null, null, new BigDecimal("200.00"), null, null);
+            PatchProductRequest req = new PatchProductRequest(null, null, null, null, new BigDecimal("200.00"), null, null, null);
 
             when(repository.findByIdAndActiveTrue(ID)).thenReturn(Optional.of(p));
             org.mockito.Mockito.doCallRealMethod().when(mapper).applyPatch(p, req);
@@ -210,7 +215,7 @@ class ProductServiceTest {
         @Test
         void patchesNothingWhenAllFieldsNull() {
             Product p = activeProduct();
-            PatchProductRequest req = new PatchProductRequest(null, null, null, null, null, null, null);
+            PatchProductRequest req = new PatchProductRequest(null, null, null, null, null, null, null, null);
 
             when(repository.findByIdAndActiveTrue(ID)).thenReturn(Optional.of(p));
 
@@ -223,7 +228,7 @@ class ProductServiceTest {
         @Test
         void patchesStock() {
             Product p = activeProduct();
-            PatchProductRequest req = new PatchProductRequest(null, null, null, null, null, 15, null);
+            PatchProductRequest req = new PatchProductRequest(null, null, null, null, null, 15, null, null);
 
             when(repository.findByIdAndActiveTrue(ID)).thenReturn(Optional.of(p));
             org.mockito.Mockito.doCallRealMethod().when(mapper).applyPatch(p, req);
@@ -236,7 +241,7 @@ class ProductServiceTest {
         @Test
         void throwsBadRequestWhenNameIsBlank() {
             Product p = activeProduct();
-            PatchProductRequest req = new PatchProductRequest(null, null, "   ", null, null, null, null);
+            PatchProductRequest req = new PatchProductRequest(null, null, "   ", null, null, null, null, null);
 
             when(repository.findByIdAndActiveTrue(ID)).thenReturn(Optional.of(p));
 
@@ -251,7 +256,7 @@ class ProductServiceTest {
         @Test
         void throwsBadRequestWhenStockNegative() {
             Product p = activeProduct();
-            PatchProductRequest req = new PatchProductRequest(null, null, null, null, null, -1, null);
+            PatchProductRequest req = new PatchProductRequest(null, null, null, null, null, -1, null, null);
 
             when(repository.findByIdAndActiveTrue(ID)).thenReturn(Optional.of(p));
 
@@ -266,7 +271,7 @@ class ProductServiceTest {
         @Test
         void throwsBadRequestWhenUnitsPerPackLessThanOne() {
             Product p = activeProduct();
-            PatchProductRequest req = new PatchProductRequest(null, null, null, null, null, null, 0);
+            PatchProductRequest req = new PatchProductRequest(null, null, null, null, null, null, 0, null);
 
             when(repository.findByIdAndActiveTrue(ID)).thenReturn(Optional.of(p));
 
@@ -276,6 +281,34 @@ class ProductServiceTest {
                         ResponseStatusException rse = (ResponseStatusException) ex;
                         assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
                     });
+        }
+
+        @Test
+        void throwsBadRequestWhenLowStockThresholdNegative() {
+            Product p = activeProduct();
+            PatchProductRequest req = new PatchProductRequest(null, null, null, null, null, null, null, -1);
+
+            when(repository.findByIdAndActiveTrue(ID)).thenReturn(Optional.of(p));
+
+            assertThatThrownBy(() -> service.patch(ID, req))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .satisfies(ex -> {
+                        ResponseStatusException rse = (ResponseStatusException) ex;
+                        assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    });
+        }
+
+        @Test
+        void patchesLowStockThreshold() {
+            Product p = activeProduct();
+            PatchProductRequest req = new PatchProductRequest(null, null, null, null, null, null, null, 50);
+
+            when(repository.findByIdAndActiveTrue(ID)).thenReturn(Optional.of(p));
+            org.mockito.Mockito.doCallRealMethod().when(mapper).applyPatch(p, req);
+
+            Product result = service.patch(ID, req);
+
+            assertThat(result.getLowStockThreshold()).isEqualTo(50);
         }
     }
 
@@ -330,6 +363,74 @@ class ProductServiceTest {
 
             assertThatThrownBy(() -> service.activate(ID))
                     .isInstanceOf(ProductNotFoundException.class);
+        }
+    }
+
+    @Nested
+    class ComputeStatus {
+        @Test
+        void outOfStockWhenStockIsZero() {
+            Product p = activeProduct();
+            p.setStock(0);
+            p.setLowStockThreshold(20);
+
+            assertThat(service.computeStatus(p)).isEqualTo(StockStatus.OUT_OF_STOCK);
+        }
+
+        @Test
+        void outOfStockWhenStockIsNull() {
+            Product p = activeProduct();
+            p.setStock(null);
+            p.setLowStockThreshold(20);
+
+            assertThat(service.computeStatus(p)).isEqualTo(StockStatus.OUT_OF_STOCK);
+        }
+
+        @Test
+        void lowStockWhenAtOrBelowThreshold() {
+            Product p = activeProduct();
+            p.setStock(20);
+            p.setLowStockThreshold(20);
+
+            assertThat(service.computeStatus(p)).isEqualTo(StockStatus.LOW_STOCK);
+        }
+
+        @Test
+        void lowStockWhenBelowThreshold() {
+            Product p = activeProduct();
+            p.setStock(5);
+            p.setLowStockThreshold(20);
+
+            assertThat(service.computeStatus(p)).isEqualTo(StockStatus.LOW_STOCK);
+        }
+
+        @Test
+        void inStockWhenAboveThreshold() {
+            Product p = activeProduct();
+            p.setStock(50);
+            p.setLowStockThreshold(20);
+
+            assertThat(service.computeStatus(p)).isEqualTo(StockStatus.IN_STOCK);
+        }
+
+        @Test
+        void usesDefaultThresholdWhenProductThresholdIsNull() {
+            Product p = activeProduct();
+            p.setStock(15);
+            p.setLowStockThreshold(null);
+
+            when(stockProperties.getDefaultLowThreshold()).thenReturn(20);
+
+            assertThat(service.computeStatus(p)).isEqualTo(StockStatus.LOW_STOCK);
+        }
+
+        @Test
+        void productThresholdOverridesDefault() {
+            Product p = activeProduct();
+            p.setStock(50);
+            p.setLowStockThreshold(60);
+
+            assertThat(service.computeStatus(p)).isEqualTo(StockStatus.LOW_STOCK);
         }
     }
 }

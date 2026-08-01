@@ -1,5 +1,7 @@
 package com.distribuidora.service;
 
+import com.distribuidora.config.StockProperties;
+import com.distribuidora.dto.product.StockStatus;
 import com.distribuidora.model.Product;
 import com.distribuidora.repository.ProductRepository;
 import com.distribuidora.repository.CategoryRepository;
@@ -29,6 +31,7 @@ public class ProductService {
   private final ProductRepository repository;
   private final ProductMapper mapper;
   private final CategoryRepository categoryRepository;
+  private final StockProperties stockProperties;
 
   public Product create(CreateProductRequest req) {
     if (req.categoryId() != null && !categoryRepository.existsByIdAndActiveTrue(req.categoryId())) {
@@ -106,6 +109,9 @@ public class ProductService {
     if (req.unitsPerPack() != null && req.unitsPerPack() < 1) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unitsPerPack must be >= 1");
     }
+    if (req.lowStockThreshold() != null && req.lowStockThreshold() < 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "lowStockThreshold must be >= 0");
+    }
     mapper.applyPatch(p, req);
     return p;
   }
@@ -113,6 +119,21 @@ public class ProductService {
   @Transactional(readOnly = true)
   public boolean existsByCategoryIdAndActiveTrue(UUID categoryId) {
     return repository.existsByCategoryIdAndActiveTrue(categoryId);
+  }
+
+  @Transactional(readOnly = true)
+  public StockStatus computeStatus(Product p) {
+    int stock = p.getStock() == null ? 0 : p.getStock();
+    if (stock <= 0) {
+      return StockStatus.OUT_OF_STOCK;
+    }
+    int threshold = p.getLowStockThreshold() != null
+        ? p.getLowStockThreshold()
+        : stockProperties.getDefaultLowThreshold();
+    if (stock <= threshold) {
+      return StockStatus.LOW_STOCK;
+    }
+    return StockStatus.IN_STOCK;
   }
 
   @Transactional(readOnly = true)

@@ -18,6 +18,7 @@ public class ProductMapper {
         .price(req.price())
         .stock(req.stock() != null ? req.stock() : 0)
         .unitsPerPack(req.unitsPerPack() != null ? req.unitsPerPack() : 1)
+        .lowStockThreshold(req.lowStockThreshold())
         .active(Boolean.TRUE)
         .build();
   }
@@ -30,6 +31,7 @@ public class ProductMapper {
     target.setPrice(req.price());
     target.setStock(req.stock());
     target.setUnitsPerPack(req.unitsPerPack() != null ? req.unitsPerPack() : 1);
+    target.setLowStockThreshold(req.lowStockThreshold());
   }
 
   public void applyPatch(Product target, PatchProductRequest req) {
@@ -53,6 +55,9 @@ public class ProductMapper {
     }
     if (req.unitsPerPack() != null) {
       target.setUnitsPerPack(req.unitsPerPack());
+    }
+    if (req.lowStockThreshold() != null) {
+      target.setLowStockThreshold(req.lowStockThreshold());
     }
   }
 }

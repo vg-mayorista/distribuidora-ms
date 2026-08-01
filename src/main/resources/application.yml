@@ -25,3 +25,7 @@ logging:
     org.hibernate.SQL: INFO
     org.hibernate.orm.jdbc.bind: TRACE
     com.distribuidora: DEBUG
+
+distribuidora:
+  stock:
+    default-low-threshold: 20

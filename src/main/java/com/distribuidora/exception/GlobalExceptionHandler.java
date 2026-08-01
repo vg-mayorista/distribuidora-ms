@@ -3,9 +3,13 @@ package com.distribuidora.exception;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Global exception handler that formats domain exceptions as RFC 7807 ProblemDetail.
@@ -125,6 +129,15 @@ public class GlobalExceptionHandler {
         ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
         detail.setDetail(ex.getMessage());
         return detail;
+    }
+
+    @ExceptionHandler(InsufficientStockException.class)
+    ResponseEntity<Map<String, Object>> handleInsufficientStock(InsufficientStockException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "INSUFFICIENT_STOCK");
+        body.put("message", ex.getMessage());
+        body.put("items", ex.getItems());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)

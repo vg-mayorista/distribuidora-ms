@@ -6,6 +6,7 @@ import com.distribuidora.dto.order.OrderResponse;
 import com.distribuidora.dto.order.UpdateOrderRequest;
 import com.distribuidora.dto.order.UpdateOrderStatusRequest;
 import com.distribuidora.exception.DeliveryMethodNotFoundException;
+import com.distribuidora.exception.InsufficientStockException;
 import com.distribuidora.exception.OrderInvalidTransitionException;
 import com.distribuidora.exception.OrderNotEditableException;
 import com.distribuidora.exception.OrderNotFoundException;
@@ -32,6 +33,7 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -100,9 +102,32 @@ public class OrderService {
                 .build();
 
         BigDecimal subtotal = BigDecimal.ZERO;
+        List<InsufficientStockException.InsufficientStockItem> stockErrors = new ArrayList<>();
+        Map<UUID, Integer> requestedByProduct = new HashMap<>();
+        Map<UUID, Product> productsById = new HashMap<>();
         for (CreateOrderRequest.OrderItemRequest itemReq : req.items()) {
             Product p = productRepository.findByIdAndActiveTrue(itemReq.productId())
                     .orElseThrow(() -> new ProductNotFoundException(itemReq.productId()));
+            int unitsPerPack = p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1 ? p.getUnitsPerPack() : 1;
+            int packs = itemReq.quantity();
+            int physicalUnits = packs * unitsPerPack;
+            requestedByProduct.merge(p.getId(), physicalUnits, Integer::sum);
+            productsById.put(p.getId(), p);
+        }
+        for (Map.Entry<UUID, Integer> entry : requestedByProduct.entrySet()) {
+            Product p = productsById.get(entry.getKey());
+            int available = p.getStock() != null ? p.getStock() : 0;
+            if (entry.getValue() > available) {
+                stockErrors.add(new InsufficientStockException.InsufficientStockItem(
+                        p.getId(), p.getName(), entry.getValue(), available));
+            }
+        }
+        if (!stockErrors.isEmpty()) {
+            throw new InsufficientStockException(stockErrors);
+        }
+
+        for (CreateOrderRequest.OrderItemRequest itemReq : req.items()) {
+            Product p = productsById.get(itemReq.productId());
             int unitsPerPack = p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1 ? p.getUnitsPerPack() : 1;
             int packs = itemReq.quantity();
             int physicalUnits = packs * unitsPerPack;
@@ -143,11 +168,40 @@ public class OrderService {
                     .orElseThrow(() -> new DeliveryMethodNotFoundException(req.deliveryMethodId()));
         }
 
+        Map<UUID, Integer> originalItemsByProduct = new HashMap<>();
+        for (OrderItem existing : order.getItems()) {
+            originalItemsByProduct.merge(existing.getProductId(), existing.getQuantity(), Integer::sum);
+        }
         order.getItems().clear();
         BigDecimal subtotal = BigDecimal.ZERO;
+        Map<UUID, Integer> requestedByProduct = new HashMap<>();
+        Map<UUID, Product> productsById = new HashMap<>();
         for (UpdateOrderRequest.OrderItemRequest itemReq : req.items()) {
             Product p = productRepository.findByIdAndActiveTrue(itemReq.productId())
                     .orElseThrow(() -> new ProductNotFoundException(itemReq.productId()));
+            int unitsPerPack = p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1 ? p.getUnitsPerPack() : 1;
+            int packs = itemReq.quantity();
+            int physicalUnits = packs * unitsPerPack;
+            requestedByProduct.merge(p.getId(), physicalUnits, Integer::sum);
+            productsById.put(p.getId(), p);
+        }
+        List<InsufficientStockException.InsufficientStockItem> stockErrors = new ArrayList<>();
+        for (Map.Entry<UUID, Integer> entry : requestedByProduct.entrySet()) {
+            int alreadyOnOrder = originalItemsByProduct.getOrDefault(entry.getKey(), 0);
+            Product p = productsById.get(entry.getKey());
+            int available = p.getStock() != null ? p.getStock() : 0;
+            int netRequested = entry.getValue() - alreadyOnOrder;
+            if (netRequested > available) {
+                stockErrors.add(new InsufficientStockException.InsufficientStockItem(
+                        p.getId(), p.getName(), entry.getValue(), available + alreadyOnOrder));
+            }
+        }
+        if (!stockErrors.isEmpty()) {
+            throw new InsufficientStockException(stockErrors);
+        }
+
+        for (UpdateOrderRequest.OrderItemRequest itemReq : req.items()) {
+            Product p = productsById.get(itemReq.productId());
             int unitsPerPack = p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1 ? p.getUnitsPerPack() : 1;
             int packs = itemReq.quantity();
             int physicalUnits = packs * unitsPerPack;

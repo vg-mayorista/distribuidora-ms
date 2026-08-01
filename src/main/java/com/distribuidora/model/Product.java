@@ -76,6 +76,10 @@ public class Product {
   @Builder.Default
   private Integer unitsPerPack = 1;
 
+  @Min(0)
+  @Column(name = "low_stock_threshold")
+  private Integer lowStockThreshold;
+
   @Builder.Default
   @Column(nullable = false)
   private Boolean active = Boolean.TRUE;

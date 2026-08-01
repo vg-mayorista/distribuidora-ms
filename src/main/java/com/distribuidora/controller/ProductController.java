@@ -1,10 +1,12 @@
 package com.distribuidora.controller;
 
+import com.distribuidora.config.security.CustomUserDetails;
+import com.distribuidora.dto.product.ProductResponse;
+import com.distribuidora.dto.product.StockStatus;
 import com.distribuidora.model.Product;
 import com.distribuidora.service.ProductService;
 import com.distribuidora.dto.product.CreateProductRequest;
 import com.distribuidora.dto.product.PatchProductRequest;
-import com.distribuidora.dto.product.ProductResponse;
 import com.distribuidora.dto.product.UpdateProductRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -18,6 +20,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -54,37 +57,43 @@ public class ProductController {
                                                   UriComponentsBuilder uriBuilder) {
         Product created = service.create(req);
         URI location = uriBuilder.path("/api/products/{id}").buildAndExpand(created.getId()).toUri();
-        return ResponseEntity.created(location).body(ProductResponse.from(created));
+        return ResponseEntity.created(location).body(ProductResponse.full(created, service.computeStatus(created)));
     }
 
     @GetMapping
-    @PreAuthorize("permitAll()")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Listar productos activos paginados")
     @ApiResponse(responseCode = "200", description = "Operación exitosa")
     public Page<ProductResponse> list(
+            @AuthenticationPrincipal CustomUserDetails user,
             @org.springdoc.core.annotations.ParameterObject
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable) {
-        return service.list(pageable).map(ProductResponse::from);
+        boolean canSeeStock = canSeeStock(user);
+        return service.list(pageable).map(p -> toResponse(p, canSeeStock));
     }
 
     @GetMapping("/search")
-    @PreAuthorize("permitAll()")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Buscar productos por nombre (case-insensitive)")
     public Page<ProductResponse> search(
+            @AuthenticationPrincipal CustomUserDetails user,
             @Parameter(description = "Texto a buscar en el nombre del producto")
             @RequestParam String name,
             @org.springdoc.core.annotations.ParameterObject
             @PageableDefault(size = 5) Pageable pageable) {
-        return service.searchByName(name, pageable).map(ProductResponse::from);
+        boolean canSeeStock = canSeeStock(user);
+        return service.searchByName(name, pageable).map(p -> toResponse(p, canSeeStock));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("permitAll()")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Obtener un producto por ID")
     public ProductResponse getById(
+            @AuthenticationPrincipal CustomUserDetails user,
             @Parameter(description = "ID del producto (UUID v4)")
             @PathVariable UUID id) {
-        return ProductResponse.from(service.getById(id));
+        Product p = service.getById(id);
+        return toResponse(p, canSeeStock(user));
     }
 
     @PutMapping("/{id}")
@@ -94,7 +103,8 @@ public class ProductController {
             @Parameter(description = "ID del producto a actualizar")
             @PathVariable UUID id,
             @Valid @RequestBody UpdateProductRequest req) {
-        return ProductResponse.from(service.update(id, req));
+        Product updated = service.update(id, req);
+        return ProductResponse.full(updated, service.computeStatus(updated));
     }
 
     @DeleteMapping("/{id}")
@@ -109,7 +119,8 @@ public class ProductController {
     @PreAuthorize("hasAnyRole('ADMIN', 'DISTRIBUTOR')")
     @Operation(summary = "Reactivar un producto")
     public ProductResponse activate(@PathVariable UUID id) {
-        return ProductResponse.from(service.activate(id));
+        Product reactivated = service.activate(id);
+        return ProductResponse.full(reactivated, service.computeStatus(reactivated));
     }
 
     @PatchMapping("/{id}")
@@ -118,6 +129,20 @@ public class ProductController {
     public ProductResponse patch(
             @PathVariable UUID id,
             @RequestBody PatchProductRequest req) {
-        return ProductResponse.from(service.patch(id, req));
+        Product patched = service.patch(id, req);
+        return ProductResponse.full(patched, service.computeStatus(patched));
+    }
+
+    private ProductResponse toResponse(Product p, boolean canSeeStock) {
+        StockStatus status = service.computeStatus(p);
+        return canSeeStock ? ProductResponse.full(p, status) : ProductResponse.redacted(p, status);
+    }
+
+    private boolean canSeeStock(CustomUserDetails user) {
+        if (user == null || user.getUser() == null || user.getUser().getRole() == null) {
+            return false;
+        }
+        String role = user.getUser().getRole().getName();
+        return "ROLE_ADMIN".equals(role) || "ROLE_DISTRIBUTOR".equals(role);
     }
 }
