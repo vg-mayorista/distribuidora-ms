@@ -110,6 +110,17 @@ public class GlobalExceptionHandler {
 
     // --- Order ---
 
+    @ExceptionHandler(MinOrderRequirementsNotMetException.class)
+    ProblemDetail handleMinOrderRequirementsNotMet(MinOrderRequirementsNotMetException ex) {
+        ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        detail.setDetail(ex.getMessage());
+        detail.setProperty("currentAmount", ex.getCurrentAmount());
+        detail.setProperty("minAmount", ex.getMinAmount());
+        detail.setProperty("currentUnits", ex.getCurrentUnits());
+        detail.setProperty("minUnits", ex.getMinUnits());
+        return detail;
+    }
+
     @ExceptionHandler(OrderNotFoundException.class)
     ProblemDetail handleOrderNotFound(OrderNotFoundException ex) {
         ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);

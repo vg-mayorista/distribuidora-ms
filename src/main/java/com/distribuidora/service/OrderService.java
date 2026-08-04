@@ -11,6 +11,8 @@ import com.distribuidora.exception.OrderInvalidTransitionException;
 import com.distribuidora.exception.OrderNotEditableException;
 import com.distribuidora.exception.OrderNotFoundException;
 import com.distribuidora.exception.ProductNotFoundException;
+import com.distribuidora.exception.MinOrderRequirementsNotMetException;
+import com.distribuidora.model.BusinessConfig;
 import com.distribuidora.model.DeliveryMethod;
 import com.distribuidora.model.Order;
 import com.distribuidora.model.OrderItem;
@@ -48,6 +50,7 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final DeliveryMethodRepository deliveryMethodRepository;
     private final UserRepository userRepository;
+    private final BusinessConfigService businessConfigService;
 
     private final Clock clock = Clock.system(ZoneId.of("America/Argentina/Buenos_Aires"));
 
@@ -145,6 +148,12 @@ public class OrderService {
                     .build();
             order.addItem(oi);
             subtotal = subtotal.add(itemSubtotal);
+        }
+
+        BusinessConfig config = businessConfigService.getOrInitConfig();
+        int totalPacks = req.items().stream().mapToInt(CreateOrderRequest.OrderItemRequest::quantity).sum();
+        if (subtotal.compareTo(config.getMinOrderAmount()) < 0 || totalPacks < config.getMinOrderUnits()) {
+            throw new MinOrderRequirementsNotMetException(subtotal, config.getMinOrderAmount(), totalPacks, config.getMinOrderUnits());
         }
 
         BigDecimal total = subtotal.add(order.getDeliveryCost());

@@ -20,6 +20,10 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
+import com.distribuidora.model.BusinessConfig;
+import com.distribuidora.repository.BusinessConfigRepository;
+import java.time.Instant;
+
 @Component
 @RequiredArgsConstructor
 public class DatabaseSeeder implements CommandLineRunner {
@@ -29,6 +33,7 @@ public class DatabaseSeeder implements CommandLineRunner {
   private final DeliveryMethodRepository deliveryMethodRepository;
   private final CategoryRepository categoryRepository;
   private final ProductRepository productRepository;
+  private final BusinessConfigRepository businessConfigRepository;
   private final PasswordEncoder passwordEncoder;
 
   @Override
@@ -38,6 +43,17 @@ public class DatabaseSeeder implements CommandLineRunner {
     seedUsers();
     seedDeliveryMethods();
     seedCategoriesAndProducts();
+    seedBusinessConfig();
+  }
+
+  private void seedBusinessConfig() {
+    if (businessConfigRepository.count() == 0) {
+      businessConfigRepository.save(BusinessConfig.builder()
+          .minOrderAmount(new BigDecimal("30000.00"))
+          .minOrderUnits(5)
+          .updatedAt(Instant.now())
+          .build());
+    }
   }
 
   private void seedRoles() {
