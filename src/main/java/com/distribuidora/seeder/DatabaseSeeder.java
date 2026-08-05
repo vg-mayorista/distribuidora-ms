@@ -15,6 +15,7 @@ import com.distribuidora.repository.DeliveryWindowRepository;
 import com.distribuidora.repository.ProductRepository;
 import com.distribuidora.repository.RoleRepository;
 import com.distribuidora.repository.UserRepository;
+import com.distribuidora.service.BusinessConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -54,8 +55,7 @@ public class DatabaseSeeder implements CommandLineRunner {
   private void seedBusinessConfig() {
     if (businessConfigRepository.count() == 0) {
       businessConfigRepository.save(BusinessConfig.builder()
-          .minOrderAmount(new BigDecimal("30000.00"))
-          .minOrderUnits(5)
+          .minPacksPerLine(BusinessConfigService.DEFAULT_MIN_PACKS_PER_LINE)
           .updatedAt(Instant.now())
           .build());
     }

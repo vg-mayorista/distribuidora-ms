@@ -5,6 +5,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,9 +14,13 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 
+/**
+ * Configuración global del negocio (singleton). Hoy expone la cantidad
+ * mínima de packs por línea que se exige en cada pedido — tanto mayorista
+ * como de stock.
+ */
 @Entity
 @Table(name = "business_config")
 @Getter
@@ -28,12 +34,22 @@ public class BusinessConfig {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "min_order_amount", nullable = false, precision = 12, scale = 2)
-    private BigDecimal minOrderAmount;
-
-    @Column(name = "min_order_units", nullable = false)
-    private Integer minOrderUnits;
+    @Column(name = "min_packs_per_line", nullable = false)
+    @Builder.Default
+    private Integer minPacksPerLine = 5;
 
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    @PrePersist
+    void onCreate() {
+        Instant now = Instant.now();
+        if (this.minPacksPerLine == null) this.minPacksPerLine = 5;
+        this.updatedAt = now;
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        this.updatedAt = Instant.now();
+    }
 }

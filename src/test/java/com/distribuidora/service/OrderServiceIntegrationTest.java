@@ -49,10 +49,9 @@ class OrderServiceIntegrationTest {
         deliveryWindowRepository.deleteAll();
         businessConfigRepository.deleteAll();
 
-        // Re-seed BusinessConfig with low thresholds so tests don't trip on the 30k/5u defaults.
+        // Re-seed BusinessConfig with a low threshold so tests don't trip on the default 5 packs.
         BusinessConfig cfg = BusinessConfig.builder()
-                .minOrderAmount(new BigDecimal("100.00"))
-                .minOrderUnits(1)
+                .minPacksPerLine(1)
                 .updatedAt(java.time.Instant.now())
                 .build();
         businessConfigRepository.save(cfg);

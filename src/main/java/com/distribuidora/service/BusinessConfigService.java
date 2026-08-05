@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -19,8 +18,7 @@ import java.util.List;
 @Transactional
 public class BusinessConfigService {
 
-    public static final BigDecimal DEFAULT_MIN_ORDER_AMOUNT = new BigDecimal("30000.00");
-    public static final int DEFAULT_MIN_ORDER_UNITS = 5;
+    public static final int DEFAULT_MIN_PACKS_PER_LINE = 5;
 
     private final BusinessConfigRepository businessConfigRepository;
     private final DeliveryWindowRepository deliveryWindowRepository;
@@ -29,8 +27,7 @@ public class BusinessConfigService {
     public BusinessConfig getOrInitConfig() {
         return businessConfigRepository.findFirstByOrderByIdAsc()
                 .orElseGet(() -> BusinessConfig.builder()
-                        .minOrderAmount(DEFAULT_MIN_ORDER_AMOUNT)
-                        .minOrderUnits(DEFAULT_MIN_ORDER_UNITS)
+                        .minPacksPerLine(DEFAULT_MIN_PACKS_PER_LINE)
                         .updatedAt(Instant.now())
                         .build());
     }
@@ -42,11 +39,8 @@ public class BusinessConfigService {
     }
 
     public BusinessConfigResponse updateConfig(UpdateBusinessConfigRequest req) {
-        BusinessConfig config = businessConfigRepository.findFirstByOrderByIdAsc()
-                .orElseGet(() -> BusinessConfig.builder().build());
-
-        config.setMinOrderAmount(req.minOrderAmount());
-        config.setMinOrderUnits(req.minOrderUnits());
+        BusinessConfig config = getOrInitConfig();
+        config.setMinPacksPerLine(req.minPacksPerLine());
         config.setUpdatedAt(Instant.now());
 
         BusinessConfig saved = businessConfigRepository.save(config);
@@ -60,8 +54,7 @@ public class BusinessConfigService {
                 .map(DeliveryWindowResponse::from)
                 .toList();
         return new BusinessConfigResponse(
-                config.getMinOrderAmount(),
-                config.getMinOrderUnits(),
+                config.getMinPacksPerLine(),
                 windows,
                 config.getUpdatedAt()
         );

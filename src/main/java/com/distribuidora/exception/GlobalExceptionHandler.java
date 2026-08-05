@@ -117,15 +117,13 @@ public class GlobalExceptionHandler {
 
     // --- Order ---
 
-    @ExceptionHandler(MinOrderRequirementsNotMetException.class)
-    ProblemDetail handleMinOrderRequirementsNotMet(MinOrderRequirementsNotMetException ex) {
-        ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
-        detail.setDetail(ex.getMessage());
-        detail.setProperty("currentAmount", ex.getCurrentAmount());
-        detail.setProperty("minAmount", ex.getMinAmount());
-        detail.setProperty("currentUnits", ex.getCurrentUnits());
-        detail.setProperty("minUnits", ex.getMinUnits());
-        return detail;
+    @ExceptionHandler(MinPacksPerLineException.class)
+    ResponseEntity<Map<String, Object>> handleMinPacksPerLine(MinPacksPerLineException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "MIN_PACKS_PER_LINE");
+        body.put("message", ex.getMessage());
+        body.put("offending", ex.getOffending());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler(OrderNotFoundException.class)

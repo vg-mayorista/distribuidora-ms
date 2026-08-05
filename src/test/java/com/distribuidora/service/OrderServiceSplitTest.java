@@ -6,7 +6,7 @@ import com.distribuidora.dto.order.UpdateOrderRequest;
 import com.distribuidora.exception.DeliveryMethodNotFoundException;
 import com.distribuidora.exception.DeliveryWindowExpiredException;
 import com.distribuidora.exception.InsufficientStockException;
-import com.distribuidora.exception.MinOrderRequirementsNotMetException;
+import com.distribuidora.exception.MinPacksPerLineException;
 import com.distribuidora.exception.OrderNotEditableException;
 import com.distribuidora.model.BusinessConfig;
 import com.distribuidora.model.DeliveryMethod;
@@ -74,8 +74,7 @@ class OrderServiceSplitTest {
         deliveryMethodId = UUID.randomUUID();
 
         when(businessConfigService.getOrInitConfig()).thenReturn(BusinessConfig.builder()
-                .minOrderAmount(new BigDecimal("100.00"))
-                .minOrderUnits(1)
+                .minPacksPerLine(1)
                 .updatedAt(Instant.now())
                 .build());
 
@@ -257,19 +256,17 @@ class OrderServiceSplitTest {
     }
 
     @Test
-    void createRejectsBelowMinOrder() {
+    void createRejectsBelowMinPacksPerLine() {
         OrderService svc = buildService();
-        // Override businessConfig to require 9999 amount
         when(businessConfigService.getOrInitConfig()).thenReturn(BusinessConfig.builder()
-                .minOrderAmount(new BigDecimal("999999.00"))
-                .minOrderUnits(1)
+                .minPacksPerLine(99)
                 .updatedAt(Instant.now())
                 .build());
         assertThatThrownBy(() -> svc.createStock(userId, new CreateOrderRequest(
                 deliveryMethodId, null, null, null, null,
                 List.of(item(productId, 2))
         )))
-                .isInstanceOf(MinOrderRequirementsNotMetException.class);
+                .isInstanceOf(MinPacksPerLineException.class);
     }
 
     @Test

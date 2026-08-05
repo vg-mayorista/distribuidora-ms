@@ -59,6 +59,7 @@ Es idempotente: usa `IF NOT EXISTS` para que sea seguro ejecutarlo varias veces.
 | Archivo | Descripción |
 |---|---|
 | `migrations/V1__add_wholesale_stock_flow.sql` | Separa el flujo de pedidos mayoristas (a fábrica, sin stock) de los de stock (excedente). Agrega `orders.type`, `delivery_methods.applies_to_order_type` y la tabla `delivery_windows`. |
+| `migrations/V2__min_packs_per_line.sql` | Cambia la regla de mínimo de pedido: ya no son $30k + 5 unidades a nivel carrito, sino que cada ítem del pedido debe tener al menos 5 packs. Agrega `business_config.min_packs_per_line` y elimina `min_order_amount` / `min_order_units`. |
 
 Para aplicarla:
 

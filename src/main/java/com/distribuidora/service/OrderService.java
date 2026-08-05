@@ -12,7 +12,7 @@ import com.distribuidora.exception.OrderInvalidTransitionException;
 import com.distribuidora.exception.OrderNotEditableException;
 import com.distribuidora.exception.OrderNotFoundException;
 import com.distribuidora.exception.ProductNotFoundException;
-import com.distribuidora.exception.MinOrderRequirementsNotMetException;
+import com.distribuidora.exception.MinPacksPerLineException;
 import com.distribuidora.model.BusinessConfig;
 import com.distribuidora.model.DeliveryMethod;
 import com.distribuidora.model.Order;
@@ -149,13 +149,7 @@ public class OrderService {
         BigDecimal subtotal = attachCreateItems(order, req.items(), productsById);
 
         BusinessConfig config = businessConfigService.getOrInitConfig();
-        int totalPacks = req.items().stream()
-                .mapToInt(CreateOrderRequest.OrderItemRequest::quantity).sum();
-        if (subtotal.compareTo(config.getMinOrderAmount()) < 0
-                || totalPacks < config.getMinOrderUnits()) {
-            throw new MinOrderRequirementsNotMetException(
-                    subtotal, config.getMinOrderAmount(), totalPacks, config.getMinOrderUnits());
-        }
+        assertMinPacksPerLineCreate(config.getMinPacksPerLine(), req.items(), productsById);
 
         BigDecimal total = subtotal.add(order.getDeliveryCost());
         order.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
@@ -215,13 +209,7 @@ public class OrderService {
         BigDecimal subtotal = attachCreateItems(order, req.items(), productsById);
 
         BusinessConfig config = businessConfigService.getOrInitConfig();
-        int totalPacks = req.items().stream()
-                .mapToInt(CreateOrderRequest.OrderItemRequest::quantity).sum();
-        if (subtotal.compareTo(config.getMinOrderAmount()) < 0
-                || totalPacks < config.getMinOrderUnits()) {
-            throw new MinOrderRequirementsNotMetException(
-                    subtotal, config.getMinOrderAmount(), totalPacks, config.getMinOrderUnits());
-        }
+        assertMinPacksPerLineCreate(config.getMinPacksPerLine(), req.items(), productsById);
 
         BigDecimal total = subtotal.add(order.getDeliveryCost());
         order.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
@@ -263,6 +251,10 @@ public class OrderService {
         Map<UUID, Product> productsById = new HashMap<>();
         collectUpdateRequestedProducts(req.items(), productsById);
         order.getItems().clear();
+
+        BusinessConfig config = businessConfigService.getOrInitConfig();
+        assertMinPacksPerLineUpdate(config.getMinPacksPerLine(), req.items(), productsById);
+
         BigDecimal subtotal = attachUpdateItems(order, req.items(), productsById);
 
         if (req.deliveryDate() != null) {
@@ -312,6 +304,9 @@ public class OrderService {
         Map<UUID, Product> productsById = new HashMap<>();
         Map<UUID, Integer> requestedByProduct =
                 collectUpdateRequestedProducts(req.items(), productsById);
+
+        BusinessConfig config = businessConfigService.getOrInitConfig();
+        assertMinPacksPerLineUpdate(config.getMinPacksPerLine(), req.items(), productsById);
 
         List<InsufficientStockException.InsufficientStockItem> stockErrors = new ArrayList<>();
         for (Map.Entry<UUID, Integer> entry : requestedByProduct.entrySet()) {
@@ -576,6 +571,41 @@ public class OrderService {
             productsById.put(p.getId(), p);
         }
         return requested;
+    }
+
+    /**
+     * Verifica que cada línea del pedido alcance el mínimo de packs por línea
+     * configurado en {@code BusinessConfig.minPacksPerLine}. Si alguna no llega,
+     * lanza {@link MinPacksPerLineException} con el detalle de las que fallan.
+     */
+    private void assertMinPacksPerLineCreate(int min,
+                                             List<CreateOrderRequest.OrderItemRequest> items,
+                                             Map<UUID, Product> productsById) {
+        List<MinPacksPerLineException.OffendingLine> bad = new ArrayList<>();
+        for (CreateOrderRequest.OrderItemRequest itemReq : items) {
+            if (itemReq.quantity() < min) {
+                Product p = productsById.get(itemReq.productId());
+                String name = p != null ? p.getName() : itemReq.productId().toString();
+                bad.add(new MinPacksPerLineException.OffendingLine(
+                        itemReq.productId(), name, itemReq.quantity(), min));
+            }
+        }
+        if (!bad.isEmpty()) throw new MinPacksPerLineException(bad, min);
+    }
+
+    private void assertMinPacksPerLineUpdate(int min,
+                                             List<UpdateOrderRequest.OrderItemRequest> items,
+                                             Map<UUID, Product> productsById) {
+        List<MinPacksPerLineException.OffendingLine> bad = new ArrayList<>();
+        for (UpdateOrderRequest.OrderItemRequest itemReq : items) {
+            if (itemReq.quantity() < min) {
+                Product p = productsById.get(itemReq.productId());
+                String name = p != null ? p.getName() : itemReq.productId().toString();
+                bad.add(new MinPacksPerLineException.OffendingLine(
+                        itemReq.productId(), name, itemReq.quantity(), min));
+            }
+        }
+        if (!bad.isEmpty()) throw new MinPacksPerLineException(bad, min);
     }
 
     // ── Misc ───────────────────────────────────────────────────────────
