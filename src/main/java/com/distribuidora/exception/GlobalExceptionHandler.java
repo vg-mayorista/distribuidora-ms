@@ -94,6 +94,13 @@ public class GlobalExceptionHandler {
         return detail;
     }
 
+    @ExceptionHandler(DeliveryWindowNotFoundException.class)
+    ProblemDetail handleDeliveryWindowNotFound(DeliveryWindowNotFoundException ex) {
+        ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        detail.setDetail(ex.getMessage());
+        return detail;
+    }
+
     @ExceptionHandler(DuplicateDeliveryMethodException.class)
     ProblemDetail handleDuplicateDeliveryMethod(DuplicateDeliveryMethodException ex) {
         ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.CONFLICT);

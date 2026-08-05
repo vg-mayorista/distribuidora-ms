@@ -38,8 +38,34 @@ public class OrderController {
 
     private final OrderService orderService;
 
+    @PostMapping("/wholesale")
+    @Operation(summary = "Crear pedido mayorista (a fábrica). Requiere deliveryDate en ventana semanal abierta.")
+    public ResponseEntity<OrderResponse> createWholesale(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @Valid @RequestBody CreateOrderRequest req,
+            UriComponentsBuilder uriBuilder) {
+        OrderResponse created = orderService.createWholesale(user.getUser().getId(), req);
+        URI location = uriBuilder.path("/api/orders/{id}").buildAndExpand(created.id()).toUri();
+        return ResponseEntity.created(location).body(created);
+    }
+
+    @PostMapping("/stock")
+    @Operation(summary = "Crear pedido contra el excedente en depósito. deliveryDate debe ser null.")
+    public ResponseEntity<OrderResponse> createStock(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @Valid @RequestBody CreateOrderRequest req,
+            UriComponentsBuilder uriBuilder) {
+        OrderResponse created = orderService.createStock(user.getUser().getId(), req);
+        URI location = uriBuilder.path("/api/orders/{id}").buildAndExpand(created.id()).toUri();
+        return ResponseEntity.created(location).body(created);
+    }
+
+    /**
+     * Compatibilidad: dispatch por presencia de {@code deliveryDate}.
+     * Conservado para clientes existentes que aún no migran a {@code /wholesale} o {@code /stock}.
+     */
     @PostMapping
-    @Operation(summary = "Crear pedido")
+    @Operation(summary = "Crear pedido (retrocompatible). Preferí /wholesale o /stock.")
     public ResponseEntity<OrderResponse> create(
             @AuthenticationPrincipal CustomUserDetails user,
             @Valid @RequestBody CreateOrderRequest req,
@@ -66,7 +92,7 @@ public class OrderController {
     }
 
     @PatchMapping("/{id}")
-    @Operation(summary = "Modificar mi pedido (solo si está PENDIENTE y antes de la fecha de edición)")
+    @Operation(summary = "Modificar mi pedido (solo si está PENDIENTE y antes del cutoff si es mayorista)")
     public OrderResponse updateMine(
             @AuthenticationPrincipal CustomUserDetails user,
             @PathVariable UUID id,
@@ -75,7 +101,7 @@ public class OrderController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Cancelar mi pedido (solo si está PENDIENTE y antes de la fecha de edición)")
+    @Operation(summary = "Cancelar mi pedido (solo si está PENDIENTE)")
     public OrderResponse cancelMine(
             @AuthenticationPrincipal CustomUserDetails user,
             @PathVariable UUID id) {

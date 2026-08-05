@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import com.distribuidora.model.OrderType;
 
 @RestController
 @RequestMapping("/api/admin/orders")
@@ -42,6 +43,7 @@ public class AdminOrderController {
     public Page<OrderResponse> list(
             @RequestParam(required = false) List<OrderStatus> statuses,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate,
+            @RequestParam(required = false) OrderType type,
             @RequestParam(required = false) UUID customerId,
             @RequestParam(required = false) String search,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -55,6 +57,9 @@ public class AdminOrderController {
         }
         if (statuses != null && !statuses.isEmpty()) {
             return orderRepository.findByStatusIn(statuses, pageable).map(orderService::toResponsePublic);
+        }
+        if (type != null) {
+            return orderRepository.findByType(type, pageable).map(orderService::toResponsePublic);
         }
         return orderService.listAll(pageable);
     }
