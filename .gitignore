@@ -34,8 +34,8 @@ build/
 # Local Pi runtime state
 .atl/
 .pi/
-openspec/
-docs/
+# (track openspec/ and docs/ — used to record change proposals and architecture)
+
 
 # Temporary execution files
 run_details.json

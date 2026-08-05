@@ -1,12 +1,17 @@
 package com.distribuidora.seeder;
 
+import com.distribuidora.model.BusinessConfig;
 import com.distribuidora.model.Category;
 import com.distribuidora.model.DeliveryMethod;
+import com.distribuidora.model.DeliveryMethodScope;
+import com.distribuidora.model.DeliveryWindow;
 import com.distribuidora.model.Product;
 import com.distribuidora.model.Role;
 import com.distribuidora.model.User;
+import com.distribuidora.repository.BusinessConfigRepository;
 import com.distribuidora.repository.CategoryRepository;
 import com.distribuidora.repository.DeliveryMethodRepository;
+import com.distribuidora.repository.DeliveryWindowRepository;
 import com.distribuidora.repository.ProductRepository;
 import com.distribuidora.repository.RoleRepository;
 import com.distribuidora.repository.UserRepository;
@@ -17,12 +22,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
-
-import com.distribuidora.model.BusinessConfig;
-import com.distribuidora.repository.BusinessConfigRepository;
-import java.time.Instant;
 
 @Component
 @RequiredArgsConstructor
@@ -34,6 +37,7 @@ public class DatabaseSeeder implements CommandLineRunner {
   private final CategoryRepository categoryRepository;
   private final ProductRepository productRepository;
   private final BusinessConfigRepository businessConfigRepository;
+  private final DeliveryWindowRepository deliveryWindowRepository;
   private final PasswordEncoder passwordEncoder;
 
   @Override
@@ -42,6 +46,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     seedRoles();
     seedUsers();
     seedDeliveryMethods();
+    seedDeliveryWindows();
     seedCategoriesAndProducts();
     seedBusinessConfig();
   }
@@ -137,11 +142,48 @@ public class DatabaseSeeder implements CommandLineRunner {
   private void seedDeliveryMethods() {
     if (deliveryMethodRepository.count() > 0) return;
     deliveryMethodRepository.save(DeliveryMethod.builder()
-        .name("Retiro en Local").cost(BigDecimal.ZERO).estimatedDays(1).active(true).build());
+        .name("Retiro en Local").cost(BigDecimal.ZERO).estimatedDays(1)
+        .appliesToOrderType(DeliveryMethodScope.BOTH).active(true).build());
     deliveryMethodRepository.save(DeliveryMethod.builder()
-        .name("Envío a Domicilio").cost(new BigDecimal("500.00")).estimatedDays(3).active(true).build());
+        .name("Envío a Domicilio").cost(new BigDecimal("500.00")).estimatedDays(3)
+        .appliesToOrderType(DeliveryMethodScope.BOTH).active(true).build());
     deliveryMethodRepository.save(DeliveryMethod.builder()
-        .name("Envío Express").cost(new BigDecimal("1200.00")).estimatedDays(1).active(true).build());
+        .name("Envío Express").cost(new BigDecimal("1200.00")).estimatedDays(1)
+        .appliesToOrderType(DeliveryMethodScope.STOCK).active(true).build());
+  }
+
+  /**
+   * Siembra las dos ventanas semanales por defecto. Es idempotente: si ya existen filas,
+   * no crea duplicados. Para entornos donde ya se cargó la BD sin estas filas, se ejecuta
+   * una sola vez al primer arranque post-migración.
+   */
+  private void seedDeliveryWindows() {
+    ensureWindow(
+            2, LocalTime.of(18, 0), 3,
+            "Pedidos hasta Mar 18 h → entrega Mié"
+    );
+    ensureWindow(
+            4, LocalTime.of(18, 0), 5,
+            "Pedidos hasta Jue 18 h → entrega Vie"
+    );
+  }
+
+  private void ensureWindow(int cutoffDow, LocalTime cutoffTime, int deliveryDow, String description) {
+    boolean alreadyExists = deliveryWindowRepository.findAll().stream().anyMatch(w ->
+            w.getCutoffDayOfWeek() != null
+                    && w.getCutoffDayOfWeek() == cutoffDow
+                    && cutoffTime.equals(w.getCutoffTime())
+                    && w.getDeliveryDayOfWeek() != null
+                    && w.getDeliveryDayOfWeek() == deliveryDow
+    );
+    if (alreadyExists) return;
+    deliveryWindowRepository.save(DeliveryWindow.builder()
+            .cutoffDayOfWeek(cutoffDow)
+            .cutoffTime(cutoffTime)
+            .deliveryDayOfWeek(deliveryDow)
+            .description(description)
+            .active(true)
+            .build());
   }
 
   private void seedCategoriesAndProducts() {

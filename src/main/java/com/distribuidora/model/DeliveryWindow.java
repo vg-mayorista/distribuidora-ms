@@ -2,17 +2,13 @@ package com.distribuidora.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -23,59 +19,57 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalTime;
 import java.util.UUID;
 
 /**
- * Delivery method entity representing available shipping options.
+ * Configurable weekly delivery window. Each window defines:
+ * <ul>
+ *   <li>{@code cutoffDayOfWeek} + {@code cutoffTime}: cierre del pedido.</li>
+ *   <li>{@code deliveryDayOfWeek}: día de la semana en que se reparte.</li>
+ * </ul>
+ * Seed inicial: martes 18:00 → miércoles, jueves 18:00 → viernes.
  *
- * <p>Soft-deletable via the {@code active} flag. Active delivery methods
- * can be selected at checkout.
- *
- * <p>Referenced by {@link Cart} via a @ManyToOne relationship.
+ * <p>Day of week uses ISO numbering (1 = lunes … 7 = domingo).
  */
 @Entity
-@Table(name = "delivery_methods", uniqueConstraints = {
-    @UniqueConstraint(name = "uk_delivery_method_name", columnNames = "name")
-})
+@Table(name = "delivery_windows")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class DeliveryMethod {
+public class DeliveryWindow {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(columnDefinition = "uuid")
     private UUID id;
 
-    @NotBlank
+    @NotNull
+    @Min(1)
+    @Max(7)
+    @Column(name = "cutoff_day_of_week", nullable = false)
+    private Integer cutoffDayOfWeek;
+
+    @NotNull
+    @Column(name = "cutoff_time", nullable = false)
+    private LocalTime cutoffTime;
+
+    @NotNull
+    @Min(1)
+    @Max(7)
+    @Column(name = "delivery_day_of_week", nullable = false)
+    private Integer deliveryDayOfWeek;
+
     @Size(max = 100)
-    @Column(nullable = false, length = 100)
-    private String name;
-
-    @NotNull
-    @DecimalMin("0.00")
-    @Digits(integer = 7, fraction = 2)
-    @Column(nullable = false, precision = 9, scale = 2)
-    private BigDecimal cost;
-
-    @NotNull
-    @Min(0)
-    @Column(name = "estimated_days", nullable = false)
-    @Builder.Default
-    private Integer estimatedDays = 0;
+    @Column(length = 100)
+    private String description;
 
     @Builder.Default
     @Column(nullable = false)
     private Boolean active = Boolean.TRUE;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "applies_to_order_type", nullable = false, length = 20)
-    @Builder.Default
-    private DeliveryMethodScope appliesToOrderType = DeliveryMethodScope.BOTH;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

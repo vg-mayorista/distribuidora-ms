@@ -49,6 +49,11 @@ public class Order {
     @Column(nullable = false, length = 20)
     private OrderStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private OrderType type = OrderType.STOCK;
+
     @Column(name = "delivery_method_id", columnDefinition = "uuid")
     private UUID deliveryMethodId;
 

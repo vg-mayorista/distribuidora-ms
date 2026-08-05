@@ -2,14 +2,17 @@ package com.distribuidora.service;
 
 import com.distribuidora.dto.config.BusinessConfigResponse;
 import com.distribuidora.dto.config.UpdateBusinessConfigRequest;
+import com.distribuidora.dto.delivery.DeliveryWindowResponse;
 import com.distribuidora.model.BusinessConfig;
 import com.distribuidora.repository.BusinessConfigRepository;
+import com.distribuidora.repository.DeliveryWindowRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +23,7 @@ public class BusinessConfigService {
     public static final int DEFAULT_MIN_ORDER_UNITS = 5;
 
     private final BusinessConfigRepository businessConfigRepository;
+    private final DeliveryWindowRepository deliveryWindowRepository;
 
     @Transactional(readOnly = true)
     public BusinessConfig getOrInitConfig() {
@@ -34,11 +38,7 @@ public class BusinessConfigService {
     @Transactional(readOnly = true)
     public BusinessConfigResponse getPublicConfig() {
         BusinessConfig config = getOrInitConfig();
-        return new BusinessConfigResponse(
-                config.getMinOrderAmount(),
-                config.getMinOrderUnits(),
-                config.getUpdatedAt()
-        );
+        return toResponse(config);
     }
 
     public BusinessConfigResponse updateConfig(UpdateBusinessConfigRequest req) {
@@ -50,10 +50,20 @@ public class BusinessConfigService {
         config.setUpdatedAt(Instant.now());
 
         BusinessConfig saved = businessConfigRepository.save(config);
+        return toResponse(saved);
+    }
+
+    private BusinessConfigResponse toResponse(BusinessConfig config) {
+        List<DeliveryWindowResponse> windows = deliveryWindowRepository
+                .findByActiveTrueOrderByCutoffDayOfWeekAscCutoffTimeAsc()
+                .stream()
+                .map(DeliveryWindowResponse::from)
+                .toList();
         return new BusinessConfigResponse(
-                saved.getMinOrderAmount(),
-                saved.getMinOrderUnits(),
-                saved.getUpdatedAt()
+                config.getMinOrderAmount(),
+                config.getMinOrderUnits(),
+                windows,
+                config.getUpdatedAt()
         );
     }
 }

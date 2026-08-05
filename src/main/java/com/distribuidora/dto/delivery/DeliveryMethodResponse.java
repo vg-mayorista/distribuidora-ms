@@ -1,6 +1,7 @@
 package com.distribuidora.dto.delivery;
 
 import com.distribuidora.model.DeliveryMethod;
+import com.distribuidora.model.DeliveryMethodScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -27,6 +28,9 @@ public record DeliveryMethodResponse(
     @Schema(description = "Indica si el método está activo", example = "true")
     Boolean active,
 
+    @Schema(description = "Para qué tipo de pedido aplica el método", example = "BOTH")
+    DeliveryMethodScope appliesToOrderType,
+
     @Schema(description = "Fecha y hora de creación", example = "2026-06-17T15:00:00Z")
     Instant createdAt,
 
@@ -40,6 +44,7 @@ public record DeliveryMethodResponse(
             dm.getCost(),
             dm.getEstimatedDays(),
             dm.getActive(),
+            dm.getAppliesToOrderType(),
             dm.getCreatedAt(),
             dm.getUpdatedAt()
         );

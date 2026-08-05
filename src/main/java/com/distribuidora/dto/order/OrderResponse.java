@@ -1,6 +1,7 @@
 package com.distribuidora.dto.order;
 
 import com.distribuidora.model.OrderStatus;
+import com.distribuidora.model.OrderType;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -14,6 +15,7 @@ public record OrderResponse(
         String customerName,
         String customerEmail,
         OrderStatus status,
+        OrderType type,
         UUID deliveryMethodId,
         String deliveryMethodName,
         BigDecimal deliveryCost,

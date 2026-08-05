@@ -400,6 +400,7 @@ public class OrderService {
                 customerName,
                 customerEmail,
                 order.getStatus(),
+                order.getType(),
                 order.getDeliveryMethodId(),
                 order.getDeliveryMethodName(),
                 order.getDeliveryCost(),
