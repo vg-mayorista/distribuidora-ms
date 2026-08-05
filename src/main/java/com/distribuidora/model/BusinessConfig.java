@@ -14,12 +14,18 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * Configuración global del negocio (singleton). Hoy expone la cantidad
- * mínima de packs por línea que se exige en cada pedido — tanto mayorista
- * como de stock.
+ * Configuración global del negocio (singleton). Reglas que aplica hoy:
+ *
+ * <ul>
+ *   <li>{@link #getMinPacksPerLine()} — mínimo de packs por línea en cada
+ *       pedido (mayorista o stock).</li>
+ *   <li>{@link #getMinOrderAmount()} — monto mínimo del subtotal del pedido
+ *       (mayorista o stock).</li>
+ * </ul>
  */
 @Entity
 @Table(name = "business_config")
@@ -38,6 +44,10 @@ public class BusinessConfig {
     @Builder.Default
     private Integer minPacksPerLine = 5;
 
+    @Column(name = "min_order_amount", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal minOrderAmount = new BigDecimal("30000.00");
+
     @Column(name = "updated_at")
     private Instant updatedAt;
 
@@ -45,6 +55,7 @@ public class BusinessConfig {
     void onCreate() {
         Instant now = Instant.now();
         if (this.minPacksPerLine == null) this.minPacksPerLine = 5;
+        if (this.minOrderAmount == null) this.minOrderAmount = new BigDecimal("30000.00");
         this.updatedAt = now;
     }
 

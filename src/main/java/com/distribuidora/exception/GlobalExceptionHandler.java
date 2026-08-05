@@ -126,6 +126,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
+    @ExceptionHandler(MinOrderAmountException.class)
+    ProblemDetail handleMinOrderAmount(MinOrderAmountException ex) {
+        ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        detail.setDetail(ex.getMessage());
+        detail.setProperty("error", "MIN_ORDER_AMOUNT");
+        detail.setProperty("currentAmount", ex.getCurrentAmount());
+        detail.setProperty("minAmount", ex.getMinAmount());
+        return detail;
+    }
+
     @ExceptionHandler(OrderNotFoundException.class)
     ProblemDetail handleOrderNotFound(OrderNotFoundException ex) {
         ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);

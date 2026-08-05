@@ -13,6 +13,7 @@ import com.distribuidora.exception.OrderNotEditableException;
 import com.distribuidora.exception.OrderNotFoundException;
 import com.distribuidora.exception.ProductNotFoundException;
 import com.distribuidora.exception.MinPacksPerLineException;
+import com.distribuidora.exception.MinOrderAmountException;
 import com.distribuidora.model.BusinessConfig;
 import com.distribuidora.model.DeliveryMethod;
 import com.distribuidora.model.Order;
@@ -150,6 +151,7 @@ public class OrderService {
 
         BusinessConfig config = businessConfigService.getOrInitConfig();
         assertMinPacksPerLineCreate(config.getMinPacksPerLine(), req.items(), productsById);
+        assertMinOrderAmount(subtotal, config.getMinOrderAmount());
 
         BigDecimal total = subtotal.add(order.getDeliveryCost());
         order.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
@@ -210,6 +212,7 @@ public class OrderService {
 
         BusinessConfig config = businessConfigService.getOrInitConfig();
         assertMinPacksPerLineCreate(config.getMinPacksPerLine(), req.items(), productsById);
+        assertMinOrderAmount(subtotal, config.getMinOrderAmount());
 
         BigDecimal total = subtotal.add(order.getDeliveryCost());
         order.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
@@ -256,6 +259,7 @@ public class OrderService {
         assertMinPacksPerLineUpdate(config.getMinPacksPerLine(), req.items(), productsById);
 
         BigDecimal subtotal = attachUpdateItems(order, req.items(), productsById);
+        assertMinOrderAmount(subtotal, config.getMinOrderAmount());
 
         if (req.deliveryDate() != null) {
             order.setDeliveryDate(req.deliveryDate());
@@ -324,6 +328,7 @@ public class OrderService {
         }
 
         BigDecimal subtotal = attachUpdateItems(order, req.items(), productsById);
+        assertMinOrderAmount(subtotal, config.getMinOrderAmount());
 
         if (dm != null) {
             order.setDeliveryMethodId(dm.getId());
@@ -606,6 +611,16 @@ public class OrderService {
             }
         }
         if (!bad.isEmpty()) throw new MinPacksPerLineException(bad, min);
+    }
+
+    /**
+     * Verifica que el subtotal del pedido alcance el {@code minOrderAmount}
+     * configurado. Si no, lanza {@link MinOrderAmountException}.
+     */
+    private void assertMinOrderAmount(BigDecimal subtotal, BigDecimal min) {
+        if (subtotal.compareTo(min) < 0) {
+            throw new MinOrderAmountException(subtotal, min);
+        }
     }
 
     // ── Misc ───────────────────────────────────────────────────────────

@@ -56,6 +56,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     if (businessConfigRepository.count() == 0) {
       businessConfigRepository.save(BusinessConfig.builder()
           .minPacksPerLine(BusinessConfigService.DEFAULT_MIN_PACKS_PER_LINE)
+          .minOrderAmount(BusinessConfigService.DEFAULT_MIN_ORDER_AMOUNT)
           .updatedAt(Instant.now())
           .build());
     }

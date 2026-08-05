@@ -7,6 +7,7 @@ import com.distribuidora.exception.DeliveryMethodNotFoundException;
 import com.distribuidora.exception.DeliveryWindowExpiredException;
 import com.distribuidora.exception.InsufficientStockException;
 import com.distribuidora.exception.MinPacksPerLineException;
+import com.distribuidora.exception.MinOrderAmountException;
 import com.distribuidora.exception.OrderNotEditableException;
 import com.distribuidora.model.BusinessConfig;
 import com.distribuidora.model.DeliveryMethod;
@@ -75,6 +76,7 @@ class OrderServiceSplitTest {
 
         when(businessConfigService.getOrInitConfig()).thenReturn(BusinessConfig.builder()
                 .minPacksPerLine(1)
+                .minOrderAmount(new BigDecimal("100.00"))
                 .updatedAt(Instant.now())
                 .build());
 
@@ -260,6 +262,7 @@ class OrderServiceSplitTest {
         OrderService svc = buildService();
         when(businessConfigService.getOrInitConfig()).thenReturn(BusinessConfig.builder()
                 .minPacksPerLine(99)
+                .minOrderAmount(new BigDecimal("100.00"))
                 .updatedAt(Instant.now())
                 .build());
         assertThatThrownBy(() -> svc.createStock(userId, new CreateOrderRequest(
@@ -267,6 +270,22 @@ class OrderServiceSplitTest {
                 List.of(item(productId, 2))
         )))
                 .isInstanceOf(MinPacksPerLineException.class);
+    }
+
+    @Test
+    void createRejectsBelowMinOrderAmount() {
+        OrderService svc = buildService();
+        // setUp deja minPacksPerLine=1 y 2 packs a $1000 = $2000 < $50.000
+        when(businessConfigService.getOrInitConfig()).thenReturn(BusinessConfig.builder()
+                .minPacksPerLine(1)
+                .minOrderAmount(new BigDecimal("50000.00"))
+                .updatedAt(Instant.now())
+                .build());
+        assertThatThrownBy(() -> svc.createStock(userId, new CreateOrderRequest(
+                deliveryMethodId, null, null, null, null,
+                List.of(item(productId, 2))
+        )))
+                .isInstanceOf(MinOrderAmountException.class);
     }
 
     @Test
