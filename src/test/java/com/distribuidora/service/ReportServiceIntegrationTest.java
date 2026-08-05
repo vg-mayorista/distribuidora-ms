@@ -29,6 +29,7 @@ class ReportServiceIntegrationTest {
     @Autowired RoleRepository roleRepository;
     @Autowired UserRepository userRepository;
     @Autowired OrderRepository orderRepository;
+    @Autowired DeliveryWindowRepository deliveryWindowRepository;
 
     UUID customerId;
     UUID otherCustomerId;
@@ -42,6 +43,7 @@ class ReportServiceIntegrationTest {
         userRepository.deleteAll();
         deliveryMethodRepository.deleteAll();
         productRepository.deleteAll();
+        deliveryWindowRepository.deleteAll();
 
         Role role = roleRepository.findByName("ROLE_CUSTOMER").orElseGet(() ->
             roleRepository.save(Role.builder().name("ROLE_CUSTOMER").description("c").build()));
@@ -69,14 +71,28 @@ class ReportServiceIntegrationTest {
         DeliveryMethod dm = deliveryMethodRepository.save(DeliveryMethod.builder()
                 .name("Envío").cost(new BigDecimal("100")).active(true).build());
         deliveryMethodId = dm.getId();
+
+        // Seed a delivery window that allows ALL days (cutoffDow == deliveryDow, 1 minute from now).
+        // Reports want to place orders with any LocalDate.now().plusDays(N).
+        if (deliveryWindowRepository.count() == 0) {
+            deliveryWindowRepository.save(DeliveryWindow.builder()
+                    .cutoffDayOfWeek(1)
+                    .cutoffTime(java.time.LocalTime.MIDNIGHT.minusSeconds(1))
+                    .deliveryDayOfWeek(7)
+                    .description("Test all-week window")
+                    .active(true)
+                    .build());
+        }
     }
 
     private CreateOrderRequest.OrderItemRequest item(UUID pid, int packs) {
         return new CreateOrderRequest.OrderItemRequest(pid, packs);
     }
 
-    private OrderResponse placeAndDeliver(UUID customer, CreateOrderRequest req) {
-        OrderResponse created = orderService.create(customer, req);
+    private OrderResponse placeAndDeliver(UUID customer, List<CreateOrderRequest.OrderItemRequest> items) {
+        CreateOrderRequest req = new CreateOrderRequest(
+                deliveryMethodId, null, null, null, null, items);
+        OrderResponse created = orderService.createStock(customer, req);
         orderService.transitionStatus(created.id(), new UpdateOrderStatusRequest(OrderStatus.ARMADO, null));
         orderService.transitionStatus(created.id(), new UpdateOrderStatusRequest(OrderStatus.ENVIADO, null));
         orderService.transitionStatus(created.id(), new UpdateOrderStatusRequest(OrderStatus.ENTREGADO, null));
@@ -85,13 +101,9 @@ class ReportServiceIntegrationTest {
 
     @Test
     void volumeCountsDeliveredOrders() {
-        placeAndDeliver(customerId, new CreateOrderRequest(
-                deliveryMethodId, LocalDate.now().plusDays(2), null, null, null,
-                List.of(item(productAId, 2))));
+        placeAndDeliver(customerId, List.of(item(productAId, 2)));
 
-        placeAndDeliver(otherCustomerId, new CreateOrderRequest(
-                deliveryMethodId, LocalDate.now().plusDays(2), null, null, null,
-                List.of(item(productBId, 5))));
+        placeAndDeliver(otherCustomerId, List.of(item(productBId, 5)));
 
         ReportService.VolumeAndTicket v = reportService.volumeAndTicket(null, null);
 
@@ -104,13 +116,9 @@ class ReportServiceIntegrationTest {
 
     @Test
     void topProductsAggregatesByProduct() {
-        placeAndDeliver(customerId, new CreateOrderRequest(
-                deliveryMethodId, LocalDate.now().plusDays(2), null, null, null,
-                List.of(item(productAId, 3))));  // 30 units
+        placeAndDeliver(customerId, List.of(item(productAId, 3)));  // 30 units
 
-        placeAndDeliver(otherCustomerId, new CreateOrderRequest(
-                deliveryMethodId, LocalDate.now().plusDays(2), null, null, null,
-                List.of(item(productAId, 2), item(productBId, 5))));  // 20 + 5 units
+        placeAndDeliver(otherCustomerId, List.of(item(productAId, 2), item(productBId, 5)));  // 20 + 5 units
 
         List<ReportService.TopProduct> top = reportService.topProducts(null, null, 10);
 
@@ -125,17 +133,11 @@ class ReportServiceIntegrationTest {
 
     @Test
     void topCustomersAggregatesByUser() {
-        placeAndDeliver(customerId, new CreateOrderRequest(
-                deliveryMethodId, LocalDate.now().plusDays(2), null, null, null,
-                List.of(item(productAId, 1))));
+        placeAndDeliver(customerId, List.of(item(productAId, 1)));
 
-        placeAndDeliver(customerId, new CreateOrderRequest(
-                deliveryMethodId, LocalDate.now().plusDays(2), null, null, null,
-                List.of(item(productBId, 2))));
+        placeAndDeliver(customerId, List.of(item(productBId, 2)));
 
-        placeAndDeliver(otherCustomerId, new CreateOrderRequest(
-                deliveryMethodId, LocalDate.now().plusDays(2), null, null, null,
-                List.of(item(productAId, 1))));
+        placeAndDeliver(otherCustomerId, List.of(item(productAId, 1)));
 
         List<ReportService.TopCustomer> top = reportService.topCustomers(null, null, 10);
 
@@ -163,9 +165,10 @@ class ReportServiceIntegrationTest {
 
     @Test
     void cancelledOrdersDoNotCountInVolume() {
-        OrderResponse created = orderService.create(customerId, new CreateOrderRequest(
-                deliveryMethodId, LocalDate.now().plusDays(2), null, null, null,
-                List.of(item(productAId, 1))));
+        CreateOrderRequest req = new CreateOrderRequest(
+                deliveryMethodId, null, null, null, null,
+                List.of(item(productAId, 1)));
+        OrderResponse created = orderService.createStock(customerId, req);
         orderService.transitionStatus(created.id(), new UpdateOrderStatusRequest(OrderStatus.CANCELADO, null));
 
         ReportService.VolumeAndTicket v = reportService.volumeAndTicket(null, null);

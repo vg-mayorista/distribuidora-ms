@@ -1,8 +1,8 @@
 # Tasks: Add Wholesale vs. Stock Order Flow
 
-Status legend: `[ ]` pending · `[x]` done · `[~]` in progress
+Status legend: `[x]` done · `[~]` in progress
 
-## Phase F1 — Backend models & schema (✅ done)
+## Phase F1 — Backend models & schema (✅)
 
 - [x] `OrderType` enum (`WHOLESALE`, `STOCK`).
 - [x] `DeliveryMethodScope` enum (`WHOLESALE`, `STOCK`, `BOTH`).
@@ -16,60 +16,87 @@ Status legend: `[ ]` pending · `[x]` done · `[~]` in progress
 - [x] `DatabaseSeeder` seeds two windows and updates `Envío Express` to STOCK.
 - [x] Idempotent SQL migration `db/migrations/V1__add_wholesale_stock_flow.sql`.
 
-## Phase F2 — DeliveryScheduleService
+## Phase F2 — DeliveryScheduleService (✅)
 
-- [ ] Service with `getNextDeliveryDates(now, n)`, `getCutoffFor(deliveryDate)`,
+- [x] Service with `getNextDeliveryDates(n)`, `getCutoffFor(deliveryDate)`,
       `isWithinWindow(deliveryDate, now)` using the AR timezone clock.
-- [ ] Unit tests covering: same-day-before-cutoff, same-day-after-cutoff,
-      weekend edges, disabled window, multi-week look-ahead.
+- [x] Constructor-injectable `Clock` (con anotación `@Autowired` para el
+      caso default) para que Spring elija el único ctor correcto.
+- [x] Unit tests (12 casos) cubriendo: pre/post cutoff, mismo día,
+      fines de semana, ventanas deshabilitadas, multi-week look-ahead.
 
-## Phase F3 — OrderService refactor
+## Phase F3 — OrderService refactor (✅)
 
-- [ ] Split `create` into `createWholesale` (no stock check, requires date) and
-      `createStock` (current behavior).
-- [ ] `updateMine` branches by `type`.
-- [ ] `ensureEditable` adds cutoff check for WHOLESALE.
-- [ ] `transitionStatus` only restores stock on STOCK orders.
-- [ ] Unit tests for both flows + edge cases.
+- [x] Split `create` en `createWholesale` y `createStock`.
+- [x] `updateMine` ramifica por `type`.
+- [x] `ensureEditable` agrega check de cutoff para WHOLESALE.
+- [x] `transitionStatus` solo maneja stock cuando `type == STOCK`.
+- [x] `updateDeliveryDate` solo aplica a WHOLESALE en PENDIENTE.
+- [x] Unit tests (13 casos) en `OrderServiceSplitTest`.
 
-## Phase F4 — Controllers & endpoints
+## Phase F4 — Controllers y endpoints (✅)
 
-- [ ] `POST /api/orders/wholesale` (`ROLE_CUSTOMER`).
-- [ ] `POST /api/orders/stock` (`ROLE_CUSTOMER`).
-- [ ] `GET/POST/PUT/DELETE /api/admin/delivery-windows`.
-- [ ] `GET /api/config/delivery-windows` (público).
-- [ ] `?type=WHOLESALE|STOCK` filter in admin/distributor order listings.
-- [ ] Swagger annotations updated.
+- [x] `POST /api/orders/wholesale` (`ROLE_CUSTOMER`).
+- [x] `POST /api/orders/stock` (`ROLE_CUSTOMER`).
+- [x] `POST /api/orders` se conserva (dispatch retrocompatible).
+- [x] `GET/POST/PUT/DELETE /api/admin/delivery-windows`.
+- [x] `GET /api/config/delivery-windows` (público).
+- [x] `?type=WHOLESALE|STOCK` filter en admin/distributor order listings.
 
-## Phase F5 — Frontend: catalog majorista
+## Phase F5 — Frontend: catálogo mayorista (✅)
 
-- [ ] Drop stock capping in `CatalogoComponent` / `cart.store`.
-- [ ] Drop `cart/check-stock` initial fetch.
+- [x] Catálogo deja de llamar `cart/check-stock`.
+- [x] Badge "Sin stock" informativo (no bloquea alta).
+- [x] Banner "Estás armando un pedido a fábrica…".
+- [x] `cartStore` pasa a tener doble: `_wholesaleLines` + `_stockLines`
+      con storage keys separadas.
+- [x] Modelos nuevos: `OrderType`, `DeliveryWindow`, `DeliveryMethodScope`.
 
-## Phase F6 — Frontend: stock-disponible
+## Phase F6 — Frontend: stock-disponible (✅)
 
-- [ ] New `StockDisponibleComponent` (filter `stock>0`, sorted desc).
-- [ ] New `stockCart.store.ts` with stock capping.
-- [ ] New entry in sidebar.
+- [x] Pantalla `/cliente/stock-disponible`.
+- [x] Filtra productos con `stock > 0`, ordenado por stock desc.
+- [x] Banner explicativo + link al catálogo mayorista.
+- [x] Carga via `cartService.checkStock` en `addToCart` (capeo por stock).
 
-## Phase F7 — Frontend: confirmar refactor
+## Phase F7 — Confirmar refactor (✅)
 
-- [ ] Two modes (wholesale / stock) with separate DTOs.
-- [ ] Wholesale: dropdown of `getNextDeliveryDates(2)`; hide Express.
-- [ ] Stock: no date; show all methods incl. Express.
+- [x] `mode: 'wholesale' | 'stock'` por ruta y/o contenido del carrito.
+- [x] Wholesale: dropdown de `getNextDeliveryDates(2)`,
+      `appliesToOrderType IN (WHOLESALE, BOTH)`.
+- [x] Stock: sin fecha, `appliesToOrderType IN (STOCK, BOTH)`,
+      submit via `createStock`.
+- [x] `mapError` traduce `DELIVERY_WINDOW_EXPIRED`.
 
-## Phase F8 — Frontend: pedidos y badges
+## Phase F8 — Mis pedidos / detalle / badges (✅)
 
-- [ ] Badge `type` in cliente mis-pedidos / detalle.
-- [ ] Same badge in distribuidor pedidos + filtro.
-- [ ] Distributor detail editDate from PENDIENTE for WHOLESALE.
+- [x] Badge `type` en `MisPedidosComponent` y `PedidoDetalleClienteComponent`.
+- [x] Columna "Flujo" + chip filter `?type=` en `DistribuidorPedidosComponent`.
+- [x] Badge `type` en `DistribuidorPedidoDetalleComponent` y `OrdersComponent` (admin).
 
-## Phase F9 — Frontend: admin delivery-windows
+## Phase F9 — Admin delivery-windows (✅)
 
-- [ ] `delivery-windows.ts/html/css` — ABM con tabla, modal crear/editar.
+- [x] `AdminDeliveryWindowService` (CRUD).
+- [x] `AdminDeliveryWindowsComponent` (tabla + modal crear/editar + eliminar).
+- [x] Ruta `/admin/delivery-windows` + entry en navbar admin.
 
-## Phase F10 — Integration & manual QA
+## Phase F10 — Integration tests & QA (✅)
 
-- [ ] `OrderServiceIntegrationTest` covering both flows end-to-end.
-- [ ] Update existing tests that were broken by `minOrderAmount` (pre-existing).
-- [ ] Manual smoke test.
+- [x] `OrderServiceIntegrationTest` actualizado a `createStock`/`createWholesale`
+      con `BusinessConfig` de bajo umbral en `setUp()`.
+- [x] `ReportServiceIntegrationTest` actualizado a `createStock` (sin
+      fechas) para que el flujo minorista siga testeable.
+- [x] Todos los 111 tests pasan en `mvn test`.
+
+## Backlog (no implementado en este PR)
+
+- Subida de comprobante de pago con cancelación automática por deadline
+  (ambas flujos STOCK y WHOLESALE).
+- Slots de retiro predefinidos para STOCK + Retiro Local.
+- Aviso automático al cliente cuando el pedido está ARMADO.
+- "Cerrar día" UI: input del excedente físico post-entrega para alimentar
+  el stock.
+- Implementación del modelo `Batch` / `lotesv1.1.md` (FEFO + expiración
+  + recall).
+- Reporte consolidado por fecha de entrega para el distribuidor (suma
+  por producto de los pedidos WHOLESALE de la próxima entrega).

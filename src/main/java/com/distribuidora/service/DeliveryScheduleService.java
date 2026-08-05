@@ -2,6 +2,7 @@ package com.distribuidora.service;
 
 import com.distribuidora.model.DeliveryWindow;
 import com.distribuidora.repository.DeliveryWindowRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,7 @@ public class DeliveryScheduleService {
     private final Clock clock;
     private final ZoneId zoneId = DEFAULT_ZONE;
 
+    @Autowired
     public DeliveryScheduleService(DeliveryWindowRepository deliveryWindowRepository) {
         this(deliveryWindowRepository, Clock.system(DEFAULT_ZONE));
     }
