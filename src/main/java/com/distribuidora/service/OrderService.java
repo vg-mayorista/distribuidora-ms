@@ -6,6 +6,7 @@ import com.distribuidora.dto.order.OrderResponse;
 import com.distribuidora.dto.order.UpdateOrderRequest;
 import com.distribuidora.dto.order.UpdateOrderStatusRequest;
 import com.distribuidora.exception.DeliveryMethodNotFoundException;
+import com.distribuidora.exception.DeliveryWindowExpiredException;
 import com.distribuidora.exception.InsufficientStockException;
 import com.distribuidora.exception.OrderInvalidTransitionException;
 import com.distribuidora.exception.OrderNotEditableException;
@@ -17,8 +18,8 @@ import com.distribuidora.model.DeliveryMethod;
 import com.distribuidora.model.Order;
 import com.distribuidora.model.OrderItem;
 import com.distribuidora.model.OrderStatus;
+import com.distribuidora.model.OrderType;
 import com.distribuidora.model.Product;
-import com.distribuidora.model.Role;
 import com.distribuidora.model.User;
 import com.distribuidora.repository.DeliveryMethodRepository;
 import com.distribuidora.repository.OrderRepository;
@@ -33,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -41,6 +43,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Lógica de pedidos. Soporta dos flujos:
+ * <ul>
+ *   <li>{@link OrderType#WHOLESALE WHOLESALE}: pedido al catálogo general; no toca stock;
+ *       requiere {@code deliveryDate} dentro de una ventana semanal abierta.</li>
+ *   <li>{@link OrderType#STOCK STOCK}: pedido del excedente en depósito; descuenta stock al
+ *       confirmar y lo restaura al cancelar.</li>
+ * </ul>
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -51,8 +62,11 @@ public class OrderService {
     private final DeliveryMethodRepository deliveryMethodRepository;
     private final UserRepository userRepository;
     private final BusinessConfigService businessConfigService;
+    private final DeliveryScheduleService deliveryScheduleService;
 
     private final Clock clock = Clock.system(ZoneId.of("America/Argentina/Buenos_Aires"));
+
+    // ── Queries ──────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public Page<OrderResponse> listMine(UUID userId, Pageable pageable) {
@@ -84,9 +98,84 @@ public class OrderService {
         return toResponse(order);
     }
 
+    // ── Create ───────────────────────────────────────────────────────────
+
+    /**
+     * Compatibilidad hacia atrás: dispatch por presencia de {@code deliveryDate}.
+     * <ul>
+     *   <li>{@code deliveryDate != null} → {@link #createWholesale}</li>
+     *   <li>{@code deliveryDate == null} → {@link #createStock}</li>
+     * </ul>
+     */
     public OrderResponse create(UUID userId, CreateOrderRequest req) {
-        if (req.items() == null || req.items().isEmpty()) {
-            throw new OrderNotEditableException("El pedido no tiene ítems.");
+        if (req.deliveryDate() == null) {
+            return createStock(userId, req);
+        }
+        return createWholesale(userId, req);
+    }
+
+    /**
+     * Pedido mayorista a fábrica.
+     * <p>{@code deliveryDate} debe existir y estar dentro de una ventana abierta
+     * ({@link DeliveryScheduleService#isWithinWindow}). No valida ni descuenta stock.
+     */
+    public OrderResponse createWholesale(UUID userId, CreateOrderRequest req) {
+        validateItemsPresent(req);
+        if (req.deliveryDate() == null) {
+            throw new OrderNotEditableException(
+                    "Pedido mayorista requiere fecha de entrega (deliveryDate).");
+        }
+        assertDeliveryDateInWindow(req.deliveryDate());
+
+        DeliveryMethod dm = deliveryMethodRepository.findByIdAndActiveTrue(req.deliveryMethodId())
+                .orElseThrow(() -> new DeliveryMethodNotFoundException(req.deliveryMethodId()));
+
+        Order order = Order.builder()
+                .userId(userId)
+                .status(OrderStatus.PENDIENTE)
+                .type(OrderType.WHOLESALE)
+                .deliveryMethodId(dm.getId())
+                .deliveryMethodName(dm.getName())
+                .deliveryCost(dm.getCost())
+                .deliveryAddress(req.deliveryAddress())
+                .deliveryPhone(req.deliveryPhone())
+                .notes(req.notes())
+                .deliveryDate(req.deliveryDate())
+                .stockDecremented(Boolean.FALSE)
+                .build();
+
+        Map<UUID, Product> productsById = new HashMap<>();
+        collectCreateRequestedProducts(req.items(), productsById);
+        BigDecimal subtotal = attachCreateItems(order, req.items(), productsById);
+
+        BusinessConfig config = businessConfigService.getOrInitConfig();
+        int totalPacks = req.items().stream()
+                .mapToInt(CreateOrderRequest.OrderItemRequest::quantity).sum();
+        if (subtotal.compareTo(config.getMinOrderAmount()) < 0
+                || totalPacks < config.getMinOrderUnits()) {
+            throw new MinOrderRequirementsNotMetException(
+                    subtotal, config.getMinOrderAmount(), totalPacks, config.getMinOrderUnits());
+        }
+
+        BigDecimal total = subtotal.add(order.getDeliveryCost());
+        order.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
+        order.setTotal(total.setScale(2, RoundingMode.HALF_UP));
+
+        // No se decrementa stock en mayorista.
+        Order saved = orderRepository.save(order);
+        return toResponse(saved);
+    }
+
+    /**
+     * Pedido contra el excedente en depósito.
+     * <p>{@code deliveryDate} debe ser nulo (la entrega es inmediata). Valida stock disponible
+     * y lo descuenta al confirmar.
+     */
+    public OrderResponse createStock(UUID userId, CreateOrderRequest req) {
+        validateItemsPresent(req);
+        if (req.deliveryDate() != null) {
+            throw new OrderNotEditableException(
+                    "Pedido de stock no lleva fecha de entrega (dejá deliveryDate en null).");
         }
 
         DeliveryMethod dm = deliveryMethodRepository.findByIdAndActiveTrue(req.deliveryMethodId())
@@ -95,28 +184,22 @@ public class OrderService {
         Order order = Order.builder()
                 .userId(userId)
                 .status(OrderStatus.PENDIENTE)
+                .type(OrderType.STOCK)
                 .deliveryMethodId(dm.getId())
                 .deliveryMethodName(dm.getName())
                 .deliveryCost(dm.getCost())
                 .deliveryAddress(req.deliveryAddress())
                 .deliveryPhone(req.deliveryPhone())
                 .notes(req.notes())
-                .deliveryDate(req.deliveryDate())
+                .deliveryDate(null)
+                .stockDecremented(Boolean.FALSE)
                 .build();
 
-        BigDecimal subtotal = BigDecimal.ZERO;
-        List<InsufficientStockException.InsufficientStockItem> stockErrors = new ArrayList<>();
-        Map<UUID, Integer> requestedByProduct = new HashMap<>();
         Map<UUID, Product> productsById = new HashMap<>();
-        for (CreateOrderRequest.OrderItemRequest itemReq : req.items()) {
-            Product p = productRepository.findByIdAndActiveTrue(itemReq.productId())
-                    .orElseThrow(() -> new ProductNotFoundException(itemReq.productId()));
-            int unitsPerPack = p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1 ? p.getUnitsPerPack() : 1;
-            int packs = itemReq.quantity();
-            int physicalUnits = packs * unitsPerPack;
-            requestedByProduct.merge(p.getId(), physicalUnits, Integer::sum);
-            productsById.put(p.getId(), p);
-        }
+        Map<UUID, Integer> requestedByProduct =
+                collectCreateRequestedProducts(req.items(), productsById);
+
+        List<InsufficientStockException.InsufficientStockItem> stockErrors = new ArrayList<>();
         for (Map.Entry<UUID, Integer> entry : requestedByProduct.entrySet()) {
             Product p = productsById.get(entry.getKey());
             int available = p.getStock() != null ? p.getStock() : 0;
@@ -129,31 +212,15 @@ public class OrderService {
             throw new InsufficientStockException(stockErrors);
         }
 
-        for (CreateOrderRequest.OrderItemRequest itemReq : req.items()) {
-            Product p = productsById.get(itemReq.productId());
-            int unitsPerPack = p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1 ? p.getUnitsPerPack() : 1;
-            int packs = itemReq.quantity();
-            int physicalUnits = packs * unitsPerPack;
-            BigDecimal itemSubtotal = p.getPrice().multiply(BigDecimal.valueOf(packs));
-
-            OrderItem oi = OrderItem.builder()
-                    .productId(p.getId())
-                    .productName(p.getName())
-                    .productImageUrl(p.getImageUrl())
-                    .packsRequested(packs)
-                    .unitsPerPackAtOrder(unitsPerPack)
-                    .quantity(physicalUnits)
-                    .unitPrice(p.getPrice())
-                    .subtotal(itemSubtotal)
-                    .build();
-            order.addItem(oi);
-            subtotal = subtotal.add(itemSubtotal);
-        }
+        BigDecimal subtotal = attachCreateItems(order, req.items(), productsById);
 
         BusinessConfig config = businessConfigService.getOrInitConfig();
-        int totalPacks = req.items().stream().mapToInt(CreateOrderRequest.OrderItemRequest::quantity).sum();
-        if (subtotal.compareTo(config.getMinOrderAmount()) < 0 || totalPacks < config.getMinOrderUnits()) {
-            throw new MinOrderRequirementsNotMetException(subtotal, config.getMinOrderAmount(), totalPacks, config.getMinOrderUnits());
+        int totalPacks = req.items().stream()
+                .mapToInt(CreateOrderRequest.OrderItemRequest::quantity).sum();
+        if (subtotal.compareTo(config.getMinOrderAmount()) < 0
+                || totalPacks < config.getMinOrderUnits()) {
+            throw new MinOrderRequirementsNotMetException(
+                    subtotal, config.getMinOrderAmount(), totalPacks, config.getMinOrderUnits());
         }
 
         BigDecimal total = subtotal.add(order.getDeliveryCost());
@@ -167,12 +234,62 @@ public class OrderService {
         return toResponse(saved);
     }
 
+    // ── Update ───────────────────────────────────────────────────────────
+
     public OrderResponse updateMine(UUID userId, UUID orderId, UpdateOrderRequest req) {
         Order order = loadOrThrow(orderId);
         if (!order.getUserId().equals(userId)) {
             throw new OrderNotFoundException(orderId);
         }
         ensureEditable(order);
+
+        if (order.getType() == OrderType.WHOLESALE) {
+            return updateWholesale(order, req);
+        }
+        return updateStock(order, req);
+    }
+
+    private OrderResponse updateWholesale(Order order, UpdateOrderRequest req) {
+        if (req.deliveryDate() != null) {
+            assertDeliveryDateInWindow(req.deliveryDate());
+        }
+
+        DeliveryMethod dm = null;
+        if (req.deliveryMethodId() != null) {
+            dm = deliveryMethodRepository.findByIdAndActiveTrue(req.deliveryMethodId())
+                    .orElseThrow(() -> new DeliveryMethodNotFoundException(req.deliveryMethodId()));
+        }
+
+        Map<UUID, Product> productsById = new HashMap<>();
+        collectUpdateRequestedProducts(req.items(), productsById);
+        order.getItems().clear();
+        BigDecimal subtotal = attachUpdateItems(order, req.items(), productsById);
+
+        if (req.deliveryDate() != null) {
+            order.setDeliveryDate(req.deliveryDate());
+        }
+        if (dm != null) {
+            order.setDeliveryMethodId(dm.getId());
+            order.setDeliveryMethodName(dm.getName());
+            order.setDeliveryCost(dm.getCost());
+        }
+        if (req.deliveryAddress() != null) order.setDeliveryAddress(req.deliveryAddress());
+        if (req.deliveryPhone() != null) order.setDeliveryPhone(req.deliveryPhone());
+        if (req.notes() != null) order.setNotes(req.notes());
+
+        BigDecimal total = subtotal.add(order.getDeliveryCost());
+        order.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
+        order.setTotal(total.setScale(2, RoundingMode.HALF_UP));
+
+        // No se toca stock en mayorista.
+        return toResponse(order);
+    }
+
+    private OrderResponse updateStock(Order order, UpdateOrderRequest req) {
+        if (req.deliveryDate() != null) {
+            throw new OrderNotEditableException(
+                    "Pedido de stock no lleva fecha de entrega (dejá deliveryDate en null).");
+        }
 
         DeliveryMethod dm = null;
         if (req.deliveryMethodId() != null) {
@@ -187,21 +304,15 @@ public class OrderService {
 
         Map<UUID, Integer> originalItemsByProduct = new HashMap<>();
         for (OrderItem existing : order.getItems()) {
-            originalItemsByProduct.merge(existing.getProductId(), existing.getQuantity(), Integer::sum);
+            originalItemsByProduct.merge(existing.getProductId(),
+                    existing.getQuantity(), Integer::sum);
         }
         order.getItems().clear();
-        BigDecimal subtotal = BigDecimal.ZERO;
-        Map<UUID, Integer> requestedByProduct = new HashMap<>();
+
         Map<UUID, Product> productsById = new HashMap<>();
-        for (UpdateOrderRequest.OrderItemRequest itemReq : req.items()) {
-            Product p = productRepository.findByIdAndActiveTrue(itemReq.productId())
-                    .orElseThrow(() -> new ProductNotFoundException(itemReq.productId()));
-            int unitsPerPack = p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1 ? p.getUnitsPerPack() : 1;
-            int packs = itemReq.quantity();
-            int physicalUnits = packs * unitsPerPack;
-            requestedByProduct.merge(p.getId(), physicalUnits, Integer::sum);
-            productsById.put(p.getId(), p);
-        }
+        Map<UUID, Integer> requestedByProduct =
+                collectUpdateRequestedProducts(req.items(), productsById);
+
         List<InsufficientStockException.InsufficientStockItem> stockErrors = new ArrayList<>();
         for (Map.Entry<UUID, Integer> entry : requestedByProduct.entrySet()) {
             int alreadyOnOrder = originalItemsByProduct.getOrDefault(entry.getKey(), 0);
@@ -217,36 +328,17 @@ public class OrderService {
             throw new InsufficientStockException(stockErrors);
         }
 
-        for (UpdateOrderRequest.OrderItemRequest itemReq : req.items()) {
-            Product p = productsById.get(itemReq.productId());
-            int unitsPerPack = p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1 ? p.getUnitsPerPack() : 1;
-            int packs = itemReq.quantity();
-            int physicalUnits = packs * unitsPerPack;
-            BigDecimal itemSubtotal = p.getPrice().multiply(BigDecimal.valueOf(packs));
-
-            OrderItem oi = OrderItem.builder()
-                    .productId(p.getId())
-                    .productName(p.getName())
-                    .productImageUrl(p.getImageUrl())
-                    .packsRequested(packs)
-                    .unitsPerPackAtOrder(unitsPerPack)
-                    .quantity(physicalUnits)
-                    .unitPrice(p.getPrice())
-                    .subtotal(itemSubtotal)
-                    .build();
-            order.addItem(oi);
-            subtotal = subtotal.add(itemSubtotal);
-        }
+        BigDecimal subtotal = attachUpdateItems(order, req.items(), productsById);
 
         if (dm != null) {
             order.setDeliveryMethodId(dm.getId());
             order.setDeliveryMethodName(dm.getName());
             order.setDeliveryCost(dm.getCost());
         }
-        order.setDeliveryDate(req.deliveryDate() != null ? req.deliveryDate() : order.getDeliveryDate());
-        order.setDeliveryAddress(req.deliveryAddress());
-        order.setDeliveryPhone(req.deliveryPhone());
-        order.setNotes(req.notes());
+        order.setDeliveryDate(null);
+        if (req.deliveryAddress() != null) order.setDeliveryAddress(req.deliveryAddress());
+        if (req.deliveryPhone() != null) order.setDeliveryPhone(req.deliveryPhone());
+        if (req.notes() != null) order.setNotes(req.notes());
 
         BigDecimal total = subtotal.add(order.getDeliveryCost());
         order.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
@@ -257,6 +349,8 @@ public class OrderService {
 
         return toResponse(order);
     }
+
+    // ── Cancel + transitions ────────────────────────────────────────────
 
     public OrderResponse cancelMine(UUID userId, UUID orderId) {
         Order order = loadOrThrow(orderId);
@@ -274,34 +368,38 @@ public class OrderService {
 
     private OrderResponse transitionInternal(Order order, OrderStatus target, String extraNotes) {
         OrderStatus current = order.getStatus();
-        boolean isRetiro = order.getDeliveryMethodName() != null && order.getDeliveryMethodName().toLowerCase().contains("retiro");
+        boolean isRetiro = order.getDeliveryMethodName() != null
+                && order.getDeliveryMethodName().toLowerCase().contains("retiro");
         boolean validTransition = false;
-        
+
         if (isRetiro) {
             validTransition = switch (current) {
                 case PENDIENTE -> target == OrderStatus.ARMADO || target == OrderStatus.CANCELADO;
-                case ARMADO    -> target == OrderStatus.ENTREGADO || target == OrderStatus.CANCELADO;
+                case ARMADO -> target == OrderStatus.ENTREGADO || target == OrderStatus.CANCELADO;
                 case ENVIADO, ENTREGADO, CANCELADO -> false;
             };
         } else {
             validTransition = current.canTransitionTo(target);
         }
-        
+
         if (!validTransition) {
             throw new OrderInvalidTransitionException(current, target);
         }
 
-        if (target == OrderStatus.ARMADO && Boolean.FALSE.equals(order.getStockDecremented())) {
-            decrementStockForOrder(order);
-            order.setStockDecremented(Boolean.TRUE);
-        }
-        if (target == OrderStatus.CANCELADO && Boolean.TRUE.equals(order.getStockDecremented())) {
-            restoreStockForOrder(order);
-            order.setStockDecremented(Boolean.FALSE);
+        boolean stockWasDecremented = Boolean.TRUE.equals(order.getStockDecremented());
+        if (order.getType() == OrderType.STOCK) {
+            if (target == OrderStatus.ARMADO && !stockWasDecremented) {
+                decrementStockForOrder(order);
+                order.setStockDecremented(Boolean.TRUE);
+            }
+            if (target == OrderStatus.CANCELADO && stockWasDecremented) {
+                restoreStockForOrder(order);
+                order.setStockDecremented(Boolean.FALSE);
+            }
         }
 
         if (target.isTerminal()) {
-            order.setClosedAt(java.time.Instant.now());
+            order.setClosedAt(Instant.now());
         }
         if (extraNotes != null && !extraNotes.isBlank()) {
             String existing = order.getNotes();
@@ -313,6 +411,27 @@ public class OrderService {
         return toResponse(order);
     }
 
+    // ── Delivery date override (distribuidor) ──────────────────────────
+
+    public OrderResponse updateDeliveryDate(UUID orderId, LocalDate deliveryDate) {
+        Order order = loadOrThrow(orderId);
+        if (order.getType() != OrderType.WHOLESALE) {
+            throw new OrderNotEditableException(
+                    "Solo los pedidos mayoristas tienen fecha de entrega a asignar.");
+        }
+        if (order.getStatus() != OrderStatus.PENDIENTE) {
+            throw new OrderNotEditableException(
+                    "La fecha de entrega solo se puede modificar cuando el pedido está PENDIENTE.");
+        }
+        if (deliveryDate != null) {
+            assertDeliveryDateInWindow(deliveryDate);
+        }
+        order.setDeliveryDate(deliveryDate);
+        return toResponse(order);
+    }
+
+    // ── Stock helpers ──────────────────────────────────────────────────
+
     private void decrementStockForOrder(Order order) {
         for (OrderItem item : order.getItems()) {
             Product p = productRepository.findById(item.getProductId())
@@ -320,7 +439,8 @@ public class OrderService {
             int newStock = p.getStock() - item.getQuantity();
             if (newStock < 0) {
                 throw new OrderNotEditableException(
-                        "Stock insuficiente para " + p.getName() + " (disponible: " + p.getStock() + ", requerido: " + item.getQuantity() + ")");
+                        "Stock insuficiente para " + p.getName() + " (disponible: "
+                                + p.getStock() + ", requerido: " + item.getQuantity() + ")");
             }
             p.setStock(newStock);
         }
@@ -333,37 +453,136 @@ public class OrderService {
         }
     }
 
+    // ── Editability ────────────────────────────────────────────────────
+
     private void ensureEditable(Order order) {
         if (order.getStatus() != OrderStatus.PENDIENTE) {
             throw new OrderNotEditableException(
-                    "El pedido ya no se puede modificar (estado actual: " + order.getStatus() + ").");
+                    "El pedido ya no se puede modificar (estado actual: "
+                            + order.getStatus() + ").");
         }
-        if (order.getDeliveryDate() != null && !isEditableByDate(order.getDeliveryDate())) {
-            throw new OrderNotEditableException(
-                    "El pedido ya no se puede modificar: pasó la fecha de edición.");
+        if (order.getType() == OrderType.WHOLESALE) {
+            if (order.getDeliveryDate() == null) {
+                throw new OrderNotEditableException(
+                        "El pedido mayorista no tiene fecha de entrega asignada.");
+            }
+            if (!deliveryScheduleService.isWithinWindow(order.getDeliveryDate())) {
+                throw new DeliveryWindowExpiredException(order.getDeliveryDate());
+            }
         }
     }
 
-    private boolean isEditableByDate(LocalDate deliveryDate) {
-        LocalDate today = LocalDate.now(clock);
-        return deliveryDate.isAfter(today);
+    private void assertDeliveryDateInWindow(LocalDate deliveryDate) {
+        if (!deliveryScheduleService.isWithinWindow(deliveryDate)) {
+            throw new DeliveryWindowExpiredException(deliveryDate);
+        }
     }
+
+    // ── Item helpers (CREATE) ──────────────────────────────────────────
+
+    private BigDecimal attachCreateItems(Order order,
+                                         List<CreateOrderRequest.OrderItemRequest> items,
+                                         Map<UUID, Product> productsById) {
+        BigDecimal subtotal = BigDecimal.ZERO;
+        for (CreateOrderRequest.OrderItemRequest itemReq : items) {
+            Product p = productsById.get(itemReq.productId());
+            int unitsPerPack = p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1
+                    ? p.getUnitsPerPack() : 1;
+            int packs = itemReq.quantity();
+            int physicalUnits = packs * unitsPerPack;
+            BigDecimal itemSubtotal = p.getPrice().multiply(BigDecimal.valueOf(packs));
+
+            OrderItem oi = OrderItem.builder()
+                    .productId(p.getId())
+                    .productName(p.getName())
+                    .productImageUrl(p.getImageUrl())
+                    .packsRequested(packs)
+                    .unitsPerPackAtOrder(unitsPerPack)
+                    .quantity(physicalUnits)
+                    .unitPrice(p.getPrice())
+                    .subtotal(itemSubtotal)
+                    .build();
+            order.addItem(oi);
+            subtotal = subtotal.add(itemSubtotal);
+        }
+        return subtotal;
+    }
+
+    private Map<UUID, Integer> collectCreateRequestedProducts(
+            List<CreateOrderRequest.OrderItemRequest> items,
+            Map<UUID, Product> productsById) {
+        Map<UUID, Integer> requested = new HashMap<>();
+        for (CreateOrderRequest.OrderItemRequest itemReq : items) {
+            Product p = productRepository.findByIdAndActiveTrue(itemReq.productId())
+                    .orElseThrow(() -> new ProductNotFoundException(itemReq.productId()));
+            int unitsPerPack = p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1
+                    ? p.getUnitsPerPack() : 1;
+            int packs = itemReq.quantity();
+            int physicalUnits = packs * unitsPerPack;
+            requested.merge(p.getId(), physicalUnits, Integer::sum);
+            productsById.put(p.getId(), p);
+        }
+        return requested;
+    }
+
+    private static void validateItemsPresent(CreateOrderRequest req) {
+        if (req.items() == null || req.items().isEmpty()) {
+            throw new OrderNotEditableException("El pedido no tiene ítems.");
+        }
+    }
+
+    // ── Item helpers (UPDATE) ──────────────────────────────────────────
+
+    private BigDecimal attachUpdateItems(Order order,
+                                         List<UpdateOrderRequest.OrderItemRequest> items,
+                                         Map<UUID, Product> productsById) {
+        BigDecimal subtotal = BigDecimal.ZERO;
+        for (UpdateOrderRequest.OrderItemRequest itemReq : items) {
+            Product p = productsById.get(itemReq.productId());
+            int unitsPerPack = p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1
+                    ? p.getUnitsPerPack() : 1;
+            int packs = itemReq.quantity();
+            int physicalUnits = packs * unitsPerPack;
+            BigDecimal itemSubtotal = p.getPrice().multiply(BigDecimal.valueOf(packs));
+
+            OrderItem oi = OrderItem.builder()
+                    .productId(p.getId())
+                    .productName(p.getName())
+                    .productImageUrl(p.getImageUrl())
+                    .packsRequested(packs)
+                    .unitsPerPackAtOrder(unitsPerPack)
+                    .quantity(physicalUnits)
+                    .unitPrice(p.getPrice())
+                    .subtotal(itemSubtotal)
+                    .build();
+            order.addItem(oi);
+            subtotal = subtotal.add(itemSubtotal);
+        }
+        return subtotal;
+    }
+
+    private Map<UUID, Integer> collectUpdateRequestedProducts(
+            List<UpdateOrderRequest.OrderItemRequest> items,
+            Map<UUID, Product> productsById) {
+        Map<UUID, Integer> requested = new HashMap<>();
+        for (UpdateOrderRequest.OrderItemRequest itemReq : items) {
+            Product p = productRepository.findByIdAndActiveTrue(itemReq.productId())
+                    .orElseThrow(() -> new ProductNotFoundException(itemReq.productId()));
+            int unitsPerPack = p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1
+                    ? p.getUnitsPerPack() : 1;
+            int packs = itemReq.quantity();
+            int physicalUnits = packs * unitsPerPack;
+            requested.merge(p.getId(), physicalUnits, Integer::sum);
+            productsById.put(p.getId(), p);
+        }
+        return requested;
+    }
+
+    // ── Misc ───────────────────────────────────────────────────────────
 
     private Order loadOrThrow(UUID id) {
         return orderRepository.findById(id)
                 .orElseThrow(() -> new OrderNotFoundException(id));
-    }
-
-    public OrderResponse updateDeliveryDate(UUID orderId, LocalDate deliveryDate) {
-        Order order = loadOrThrow(orderId);
-        if (order.getStatus() != OrderStatus.ARMADO) {
-            throw new OrderNotEditableException("La fecha de entrega solo se puede asignar cuando el pedido está armado.");
-        }
-        if (order.getDeliveryMethodName() != null && order.getDeliveryMethodName().toLowerCase().contains("retiro")) {
-            throw new OrderNotEditableException("Un pedido con retiro en local no requiere fecha de envío.");
-        }
-        order.setDeliveryDate(deliveryDate);
-        return toResponse(order);
     }
 
     private OrderResponse toResponse(Order order) {
@@ -387,10 +606,14 @@ public class OrderService {
                 .toList();
 
         boolean editable = order.getStatus() == OrderStatus.PENDIENTE
-                && (order.getDeliveryDate() == null || isEditableByDate(order.getDeliveryDate()));
+                && isEditableByTypeAndDate(order);
 
-        java.time.LocalDate dateValue = order.getDeliveryDate();
-        if (order.getDeliveryMethodName() != null && order.getDeliveryMethodName().toLowerCase().contains("retiro")) {
+        LocalDate dateValue = order.getDeliveryDate();
+        if (order.getDeliveryMethodName() != null
+                && order.getDeliveryMethodName().toLowerCase().contains("retiro")) {
+            dateValue = null;
+        }
+        if (order.getType() == OrderType.STOCK) {
             dateValue = null;
         }
 
@@ -417,5 +640,13 @@ public class OrderService {
                 order.getUpdatedAt(),
                 order.getClosedAt()
         );
+    }
+
+    private boolean isEditableByTypeAndDate(Order order) {
+        if (order.getType() == OrderType.WHOLESALE) {
+            return order.getDeliveryDate() != null
+                    && deliveryScheduleService.isWithinWindow(order.getDeliveryDate());
+        }
+        return order.getStatus() == OrderStatus.PENDIENTE;
     }
 }

@@ -2,7 +2,6 @@ package com.distribuidora.dto.order;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -16,7 +15,11 @@ public record CreateOrderRequest(
         @NotNull
         UUID deliveryMethodId,
 
-        @FutureOrPresent
+        /**
+         * Si está presente, el pedido se trata como mayorista (a fábrica): se exige que la
+         * fecha esté dentro de una ventana semanal abierta. Si es {@code null}, el pedido
+         * se trata como de stock (excedente): sin fecha de entrega.
+         */
         LocalDate deliveryDate,
 
         @Size(max = 500)

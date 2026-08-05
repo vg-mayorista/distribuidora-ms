@@ -151,6 +151,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
+    @ExceptionHandler(DeliveryWindowExpiredException.class)
+    ProblemDetail handleDeliveryWindowExpired(DeliveryWindowExpiredException ex) {
+        ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        detail.setDetail(ex.getMessage());
+        detail.setProperty("error", "DELIVERY_WINDOW_EXPIRED");
+        detail.setProperty("deliveryDate", ex.getDeliveryDate().toString());
+        return detail;
+    }
+
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     ProblemDetail handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
         ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
