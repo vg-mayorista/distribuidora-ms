@@ -24,6 +24,7 @@ public class BusinessConfigService {
 
     private final BusinessConfigRepository businessConfigRepository;
     private final DeliveryWindowRepository deliveryWindowRepository;
+    private final DeliveryScheduleService deliveryScheduleService;
 
     @Transactional(readOnly = true)
     public BusinessConfig getOrInitConfig() {
@@ -56,10 +57,12 @@ public class BusinessConfigService {
                 .stream()
                 .map(DeliveryWindowResponse::from)
                 .toList();
+        Instant nextCutoff = deliveryScheduleService.getNextCutoffInstant().orElse(null);
         return new BusinessConfigResponse(
                 config.getMinPacksPerLine(),
                 config.getMinOrderAmount(),
                 windows,
+                nextCutoff,
                 config.getUpdatedAt()
         );
     }

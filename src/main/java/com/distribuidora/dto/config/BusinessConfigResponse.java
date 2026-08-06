@@ -10,5 +10,6 @@ public record BusinessConfigResponse(
         Integer minPacksPerLine,
         BigDecimal minOrderAmount,
         List<DeliveryWindowResponse> deliveryWindows,
+        Instant nextCutoffInstant,
         Instant updatedAt
 ) {}

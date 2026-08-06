@@ -56,23 +56,50 @@ public class DeliveryScheduleService {
         return clock;
     }
 
-    /**
-     * Devuelve hasta {@code n} fechas de entrega futuras (incluyendo hoy si todavía está
-     * disponible) cuyo cutoff aún no haya pasado. Orden ascendente.
-     */
-    public List<LocalDate> getNextDeliveryDates(int n) {
-        if (n <= 0) return List.of();
-        LocalDate today = LocalDate.now(clock.withZone(zoneId));
-        List<DeliveryWindow> windows = activeWindows();
-        List<LocalDate> result = new ArrayList<>();
-        for (int offset = 0; offset < MAX_LOOKAHEAD_DAYS && result.size() < n; offset++) {
-            LocalDate candidate = today.plusDays(offset);
-            if (isAvailableFor(candidate, windows)) {
-                result.add(candidate);
-            }
-        }
-        return result;
+/**
+   * Devuelve hasta {@code n} fechas de entrega futuras (incluyendo hoy si todavía está
+   * disponible) cuyo cutoff aún no haya pasado. Orden ascendente.
+   */
+  public List<LocalDate> getNextDeliveryDates(int n) {
+    if (n <= 0) return List.of();
+    LocalDate today = LocalDate.now(clock.withZone(zoneId));
+    List<DeliveryWindow> windows = activeWindows();
+    List<LocalDate> result = new ArrayList<>();
+    for (int offset = 0; offset < MAX_LOOKAHEAD_DAYS && result.size() < n; offset++) {
+      LocalDate candidate = today.plusDays(offset);
+      if (isAvailableFor(candidate, windows)) {
+        result.add(candidate);
+      }
     }
+    return result;
+  }
+
+  /**
+   * Próximo cutoff aún no vencido entre todas las ventanas activas. Útil para
+   * mostrar banners tipo "queda 1 hora para confirmar el pedido" en el frontend.
+   * Devuelve {@code Optional.empty()} si ya pasaron todos los cutoffs del horizonte
+   * de lookahead (caso patológico, todas las ventanas cerradas).
+   */
+  public Optional<Instant> getNextCutoffInstant() {
+    Instant now = clock.instant();
+    return activeWindows().stream()
+        .flatMap(w -> cutoffsInLookahead(w, now).stream())
+        .filter(c -> c.isAfter(now))
+        .min(Comparator.naturalOrder());
+  }
+
+  private List<Instant> cutoffsInLookahead(DeliveryWindow w, Instant now) {
+    List<Instant> out = new ArrayList<>();
+    LocalDate today = LocalDate.now(clock.withZone(zoneId));
+    for (int offset = 0; offset < MAX_LOOKAHEAD_DAYS; offset++) {
+      LocalDate candidate = today.plusDays(offset);
+      if (w.getDeliveryDayOfWeek() == null) continue;
+      if (candidate.getDayOfWeek().getValue() != w.getDeliveryDayOfWeek()) continue;
+      Instant cutoff = toCutoffInstant(candidate, w);
+      if (cutoff != null) out.add(cutoff);
+    }
+    return out;
+  }
 
     public Optional<Instant> getCutoffFor(LocalDate deliveryDate) {
         int deliveryDow = deliveryDate.getDayOfWeek().getValue();
