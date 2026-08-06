@@ -193,6 +193,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     Category lacteos = ensureCategory("Lácteos");
     Category limpieza = ensureCategory("Limpieza");
     Category carniceria = ensureCategory("Carnicería");
+    Category golosinas = ensureCategory("Golosinas");
 
     ensureProduct("Yerba Mate 1kg", "Yerba mate suave, paquete de 1kg.", 5500.00, 240, 12, almacen);
     ensureProduct("Azúcar Ledesma 1kg", "Azúcar blanca refinada tipo A, bolsa 1kg.", 1800.00, 360, 12, almacen);
@@ -222,6 +223,19 @@ public class DatabaseSeeder implements CommandLineRunner {
     ensureProduct("Carne Picada Especial 1kg", "Carne picada especial, bandeja 1kg.", 8500.00, 40, 1, carniceria);
     ensureProduct("Pollo Entero 2kg", "Pollo entero fresco, bandeja 2kg.", 6200.00, 30, 1, carniceria);
     ensureProduct("Asado de Tira 1kg", "Asado de tira, bandeja 1kg.", 9200.00, 35, 1, carniceria);
+
+    // --- Edge cases para testear el flujo stock-disponible ---
+    // Stock = 0 → no aparece en /cliente/stock-disponible, sí en mayorista con badge "Sin stock"
+    ensureProduct("Galletas Dulces 200g", "Galletas dulces con chips de chocolate, paquete 200g.", 1400.00, 0, 12, golosinas);
+    ensureProduct("Galletitas Saladas 150g", "Galletitas saladas con semillas, paquete 150g.", 1300.00, 0, 12, golosinas);
+
+    // Stock bajo (< 20) → badge "low" en stock-disponible
+    ensureProduct("Chocolate en Polvo 250g", "Chocolate en polvo para repostería, lata 250g.", 3600.00, 15, 6, golosinas);
+    ensureProduct("Caramelos Masticables 100g", "Caramelos masticables surtidos, bolsa 100g.", 1800.00, 8, 12, golosinas);
+    ensureProduct("Mermelada Durazno 250g", "Mermelada de durazno casera, frasco 250g.", 2900.00, 12, 1, lacteos);
+
+    // Stock muy bajo con unidades por pack = 1 (testear 1 pack y máximo)
+    ensureProduct("Huevos Docena", "Docena de huevos frescos, bandeja.", 4500.00, 3, 1, lacteos);
   }
 
   private Category ensureCategory(String name) {
@@ -236,10 +250,22 @@ public class DatabaseSeeder implements CommandLineRunner {
 
   private void ensureProduct(String name, String description, double price,
                              int stockUnits, int unitsPerPack, Category category) {
-    boolean exists = productRepository.findAll().stream()
-        .anyMatch(p -> p.getName().equalsIgnoreCase(name));
-    if (exists) return;
+    ensureProduct(name, description, price, stockUnits, unitsPerPack, category, true);
+  }
 
+  private void ensureProduct(String name, String description, double price,
+                             int stockUnits, int unitsPerPack, Category category, boolean active) {
+    Product existing = productRepository.findAll().stream()
+        .filter(p -> p.getName().equalsIgnoreCase(name))
+        .findFirst()
+        .orElse(null);
+    if (existing != null) {
+      existing.setStock(stockUnits);
+      existing.setUnitsPerPack(unitsPerPack);
+      existing.setActive(active);
+      productRepository.save(existing);
+      return;
+    }
     productRepository.save(Product.builder()
         .name(name)
         .description(description)
@@ -247,7 +273,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         .stock(stockUnits)
         .unitsPerPack(unitsPerPack)
         .categoryId(category.getId())
-        .active(true)
+        .active(active)
         .build());
   }
 }
