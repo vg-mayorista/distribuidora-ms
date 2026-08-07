@@ -10,5 +10,8 @@ public record AuthResponse(
     String lastName,
     String role,
     String address,
-    String phone
+    String phone,
+    String zone,
+    String latitude,
+    String longitude
 ) {}

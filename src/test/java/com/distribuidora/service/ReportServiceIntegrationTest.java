@@ -30,6 +30,7 @@ class ReportServiceIntegrationTest {
     @Autowired UserRepository userRepository;
     @Autowired OrderRepository orderRepository;
     @Autowired DeliveryWindowRepository deliveryWindowRepository;
+    @Autowired BusinessConfigRepository businessConfigRepository;
 
     UUID customerId;
     UUID otherCustomerId;
@@ -44,6 +45,16 @@ class ReportServiceIntegrationTest {
         deliveryMethodRepository.deleteAll();
         productRepository.deleteAll();
         deliveryWindowRepository.deleteAll();
+        businessConfigRepository.deleteAll();
+
+        // getOrInitConfig busca findFirstByOrderByIdAsc — sin id fijo el id
+        // se autogenera y getOrInitConfig lo encuentra igual.
+        BusinessConfig cfg = BusinessConfig.builder()
+                .minPacksPerLine(1)
+                .minOrderAmount(new BigDecimal("100.00"))
+                .updatedAt(java.time.Instant.now())
+                .build();
+        businessConfigRepository.save(cfg);
 
         Role role = roleRepository.findByName("ROLE_CUSTOMER").orElseGet(() ->
             roleRepository.save(Role.builder().name("ROLE_CUSTOMER").description("c").build()));
@@ -69,7 +80,7 @@ class ReportServiceIntegrationTest {
         productBId = b.getId();
 
         DeliveryMethod dm = deliveryMethodRepository.save(DeliveryMethod.builder()
-                .name("Envío").cost(new BigDecimal("100")).active(true).build());
+                .name("Envío Express").cost(new BigDecimal("100")).appliesToOrderType(DeliveryMethodScope.STOCK).active(true).build());
         deliveryMethodId = dm.getId();
 
         // Seed a delivery window that allows ALL days (cutoffDow == deliveryDow, 1 minute from now).

@@ -12,6 +12,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -53,6 +54,15 @@ public class User {
 
   @Column(name = "phone", length = 20)
   private String phone;
+
+  @Column(name = "zone", length = 100)
+  private String zone;
+
+  @Column(name = "latitude", precision = 10, scale = 7)
+  private BigDecimal latitude;
+
+  @Column(name = "longitude", precision = 10, scale = 7)
+  private BigDecimal longitude;
 
   @Builder.Default
   @Column(nullable = false)
