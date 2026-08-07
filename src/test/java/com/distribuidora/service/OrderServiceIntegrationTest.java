@@ -53,7 +53,8 @@ class OrderServiceIntegrationTest {
         deliveryWindowRepository.deleteAll();
         businessConfigRepository.deleteAll();
 
-        // Re-seed BusinessConfig with thresholds bajos para que el suite pueda crear pedidos sin restricciones.
+        // Re-seed BusinessConfig con thresholds bajos. Sin id fijo: el id se autogenera
+        // y getOrInitConfig (findFirstByOrderByIdAsc) lo encuentra igual.
         BusinessConfig cfg = BusinessConfig.builder()
                 .minPacksPerLine(1)
                 .minOrderAmount(new BigDecimal("100.00"))

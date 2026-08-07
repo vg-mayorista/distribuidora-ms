@@ -30,6 +30,7 @@ class ReportServiceIntegrationTest {
     @Autowired UserRepository userRepository;
     @Autowired OrderRepository orderRepository;
     @Autowired DeliveryWindowRepository deliveryWindowRepository;
+    @Autowired BusinessConfigRepository businessConfigRepository;
 
     UUID customerId;
     UUID otherCustomerId;
@@ -44,6 +45,16 @@ class ReportServiceIntegrationTest {
         deliveryMethodRepository.deleteAll();
         productRepository.deleteAll();
         deliveryWindowRepository.deleteAll();
+        businessConfigRepository.deleteAll();
+
+        // getOrInitConfig busca findFirstByOrderByIdAsc — sin id fijo el id
+        // se autogenera y getOrInitConfig lo encuentra igual.
+        BusinessConfig cfg = BusinessConfig.builder()
+                .minPacksPerLine(1)
+                .minOrderAmount(new BigDecimal("100.00"))
+                .updatedAt(java.time.Instant.now())
+                .build();
+        businessConfigRepository.save(cfg);
 
         Role role = roleRepository.findByName("ROLE_CUSTOMER").orElseGet(() ->
             roleRepository.save(Role.builder().name("ROLE_CUSTOMER").description("c").build()));
