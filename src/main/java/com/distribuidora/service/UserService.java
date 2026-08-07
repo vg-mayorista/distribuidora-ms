@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Service
@@ -43,6 +44,15 @@ public class UserService {
         if (request.phone() != null) {
             user.setPhone(request.phone());
         }
+        if (request.zone() != null) {
+            user.setZone(request.zone());
+        }
+        if (request.latitude() != null) {
+            user.setLatitude(parseCoord(request.latitude()));
+        }
+        if (request.longitude() != null) {
+            user.setLongitude(parseCoord(request.longitude()));
+        }
 
         User saved = userRepository.save(user);
         return UserProfileResponse.from(saved);
@@ -66,6 +76,15 @@ public class UserService {
         user.setActive(!user.getActive());
         User saved = userRepository.save(user);
         return CustomerSummaryResponse.from(saved);
+    }
+
+    private static BigDecimal parseCoord(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return new BigDecimal(raw.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }
 

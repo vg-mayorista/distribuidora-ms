@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.distribuidora.config.security.InMemoryTokenBlacklistService;
+import java.math.BigDecimal;
 import java.util.Date;
 
 @Service
@@ -78,6 +79,11 @@ public class AuthService {
         .password(passwordEncoder.encode(request.password()))
         .firstName(request.firstName())
         .lastName(request.lastName())
+        .phone(request.phone())
+        .address(request.address())
+        .zone(request.zone())
+        .latitude(parseCoord(request.latitude()))
+        .longitude(parseCoord(request.longitude()))
         .role(userRole)
         .active(true)
         .build();
@@ -86,15 +92,7 @@ public class AuthService {
     CustomUserDetails userDetails = new CustomUserDetails(savedUser);
     String token = jwtService.generateToken(userDetails);
 
-    AuthResponse response = new AuthResponse(
-        token,
-        savedUser.getId(),
-        savedUser.getEmail(),
-        savedUser.getFirstName(),
-        savedUser.getLastName(),
-        savedUser.getRole().getName(),
-        savedUser.getAddress(),
-        savedUser.getPhone());
+    AuthResponse response = toAuthResponse(token, savedUser);
 
     return new com.distribuidora.dto.user.RegisterResult.Success(response);
   }
@@ -109,15 +107,7 @@ public class AuthService {
       User user = userDetails.getUser();
       String token = jwtService.generateToken(userDetails);
 
-      AuthResponse response = new AuthResponse(
-          token,
-          user.getId(),
-          user.getEmail(),
-          user.getFirstName(),
-          user.getLastName(),
-          user.getRole().getName(),
-          user.getAddress(),
-          user.getPhone());
+      AuthResponse response = toAuthResponse(token, user);
       return new LoginResult.Success(response);
     } catch (org.springframework.security.core.AuthenticationException e) {
       return new LoginResult.InvalidCredentials();
@@ -127,5 +117,31 @@ public class AuthService {
   public void logout(String token) {
     Date expiration = jwtService.extractExpiration(token);
     tokenBlacklistService.blacklistToken(token, expiration);
+  }
+
+  private static AuthResponse toAuthResponse(String token, User user) {
+    String lat = user.getLatitude() == null ? null : user.getLatitude().toPlainString();
+    String lng = user.getLongitude() == null ? null : user.getLongitude().toPlainString();
+    return new AuthResponse(
+        token,
+        user.getId(),
+        user.getEmail(),
+        user.getFirstName(),
+        user.getLastName(),
+        user.getRole().getName(),
+        user.getAddress(),
+        user.getPhone(),
+        user.getZone(),
+        lat,
+        lng);
+  }
+
+  private static BigDecimal parseCoord(String raw) {
+    if (raw == null || raw.isBlank()) return null;
+    try {
+      return new BigDecimal(raw.trim());
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 }

@@ -6,6 +6,7 @@ import com.distribuidora.dto.order.OrderResponse;
 import com.distribuidora.dto.order.UpdateOrderRequest;
 import com.distribuidora.dto.order.UpdateOrderStatusRequest;
 import com.distribuidora.exception.DeliveryMethodNotFoundException;
+import com.distribuidora.exception.DeliveryMethodUnavailableException;
 import com.distribuidora.exception.DeliveryWindowExpiredException;
 import com.distribuidora.exception.InsufficientStockException;
 import com.distribuidora.exception.OrderInvalidTransitionException;
@@ -16,6 +17,7 @@ import com.distribuidora.exception.MinPacksPerLineException;
 import com.distribuidora.exception.MinOrderAmountException;
 import com.distribuidora.model.BusinessConfig;
 import com.distribuidora.model.DeliveryMethod;
+import com.distribuidora.model.DeliveryMethodScope;
 import com.distribuidora.model.Order;
 import com.distribuidora.model.OrderItem;
 import com.distribuidora.model.OrderStatus;
@@ -35,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -137,7 +140,7 @@ public class OrderService {
                 .type(OrderType.WHOLESALE)
                 .deliveryMethodId(dm.getId())
                 .deliveryMethodName(dm.getName())
-                .deliveryCost(dm.getCost())
+                .deliveryCost(computeDeliveryCost(dm, req.deliveryDate()))
                 .deliveryAddress(req.deliveryAddress())
                 .deliveryPhone(req.deliveryPhone())
                 .notes(req.notes())
@@ -164,8 +167,7 @@ public class OrderService {
 
     /**
      * Pedido contra el excedente en depósito.
-     * <p>{@code deliveryDate} debe ser nulo (la entrega es inmediata). Valida stock disponible
-     * y lo descuenta al confirmar.
+     * <p>La entrega es inmediata (Envío Express). {@code deliveryDate} debe ser nulo.</p>
      */
     public OrderResponse createStock(UUID userId, CreateOrderRequest req) {
         validateItemsPresent(req);
@@ -176,6 +178,23 @@ public class OrderService {
 
         DeliveryMethod dm = deliveryMethodRepository.findByIdAndActiveTrue(req.deliveryMethodId())
                 .orElseThrow(() -> new DeliveryMethodNotFoundException(req.deliveryMethodId()));
+        // Defensa contra llamadas API que manden un método de scope WHOLESALE-only
+        // (e.g. "Envío a Domicilio"). El frontend ya filtra por scope, pero el backend
+        // no debe aceptar órdenes stock con métodos que no son ni STOCK ni BOTH.
+        if (dm.getAppliesToOrderType() == DeliveryMethodScope.WHOLESALE) {
+            throw new DeliveryMethodUnavailableException(
+                    "El método de entrega '" + dm.getName() + "' no está disponible para pedidos de stock.");
+        }
+
+        // "Envío a Domicilio" en stock hereda la regla de wholesale: la entrega
+        // se programa al próximo Wed/Fri disponible. El cliente no elige día
+        // en stock, pero el costo refleja la regla (gratis en Wed/Fri).
+        BigDecimal cost;
+        if ("Envío a Domicilio".equalsIgnoreCase(dm.getName())) {
+            cost = computeDeliveryCost(dm, nextAvailableDeliveryDate());
+        } else {
+            cost = dm.getCost();
+        }
 
         Order order = Order.builder()
                 .userId(userId)
@@ -183,7 +202,7 @@ public class OrderService {
                 .type(OrderType.STOCK)
                 .deliveryMethodId(dm.getId())
                 .deliveryMethodName(dm.getName())
-                .deliveryCost(dm.getCost())
+                .deliveryCost(cost)
                 .deliveryAddress(req.deliveryAddress())
                 .deliveryPhone(req.deliveryPhone())
                 .notes(req.notes())
@@ -579,20 +598,26 @@ public class OrderService {
     }
 
     /**
-     * Verifica que cada línea del pedido alcance el mínimo de packs por línea
-     * configurado en {@code BusinessConfig.minPacksPerLine}. Si alguna no llega,
-     * lanza {@link MinPacksPerLineException} con el detalle de las que fallan.
+     * Verifica que cada línea del pedido alcance el mínimo de unidades físicas
+     * por línea configurado en {@code BusinessConfig.minPacksPerLine}. El nombre
+     * del campo conserva "Packs" por compatibilidad con la migración, pero la
+     * semántica es "mínimo de unidades físicas por línea" (packs × unitsPerPack).
+     * Si alguna no llega, lanza {@link MinPacksPerLineException} con el detalle.
      */
     private void assertMinPacksPerLineCreate(int min,
                                              List<CreateOrderRequest.OrderItemRequest> items,
                                              Map<UUID, Product> productsById) {
         List<MinPacksPerLineException.OffendingLine> bad = new ArrayList<>();
         for (CreateOrderRequest.OrderItemRequest itemReq : items) {
-            if (itemReq.quantity() < min) {
-                Product p = productsById.get(itemReq.productId());
+            Product p = productsById.get(itemReq.productId());
+            int unitsPerPack = p != null && p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1
+                    ? p.getUnitsPerPack() : 1;
+            int packs = itemReq.quantity();
+            int units = packs * unitsPerPack;
+            if (units < min) {
                 String name = p != null ? p.getName() : itemReq.productId().toString();
                 bad.add(new MinPacksPerLineException.OffendingLine(
-                        itemReq.productId(), name, itemReq.quantity(), min));
+                        itemReq.productId(), name, units, packs, min));
             }
         }
         if (!bad.isEmpty()) throw new MinPacksPerLineException(bad, min);
@@ -603,11 +628,15 @@ public class OrderService {
                                              Map<UUID, Product> productsById) {
         List<MinPacksPerLineException.OffendingLine> bad = new ArrayList<>();
         for (UpdateOrderRequest.OrderItemRequest itemReq : items) {
-            if (itemReq.quantity() < min) {
-                Product p = productsById.get(itemReq.productId());
+            Product p = productsById.get(itemReq.productId());
+            int unitsPerPack = p != null && p.getUnitsPerPack() != null && p.getUnitsPerPack() >= 1
+                    ? p.getUnitsPerPack() : 1;
+            int packs = itemReq.quantity();
+            int units = packs * unitsPerPack;
+            if (units < min) {
                 String name = p != null ? p.getName() : itemReq.productId().toString();
                 bad.add(new MinPacksPerLineException.OffendingLine(
-                        itemReq.productId(), name, itemReq.quantity(), min));
+                        itemReq.productId(), name, units, packs, min));
             }
         }
         if (!bad.isEmpty()) throw new MinPacksPerLineException(bad, min);
@@ -693,5 +722,40 @@ public class OrderService {
                     && deliveryScheduleService.isWithinWindow(order.getDeliveryDate());
         }
         return order.getStatus() == OrderStatus.PENDIENTE;
+    }
+
+    /**
+     * Costo final del envío. "Envío a Domicilio" es gratis cuando la entrega
+     * cae en miércoles o viernes (los días de reparto del flujo mayorista);
+     * cualquier otro día se cobra el costo base del método.
+     */
+    private BigDecimal computeDeliveryCost(DeliveryMethod dm, LocalDate deliveryDate) {
+        BigDecimal baseCost = dm.getCost();
+        if (deliveryDate == null) return baseCost;
+        DayOfWeek dow = deliveryDate.getDayOfWeek();
+        if ("Envío a Domicilio".equalsIgnoreCase(dm.getName())
+                && (dow == DayOfWeek.WEDNESDAY || dow == DayOfWeek.FRIDAY)) {
+            return BigDecimal.ZERO;
+        }
+        return baseCost;
+    }
+
+    /**
+     * Próxima fecha Wed/Fri dentro de la ventana de corte configurada.
+     * Si no hay ninguna en los próximos 14 días, devuelve hoy (caso edge).
+     * Usado por createStock para "Envío a Domicilio" sin que el cliente
+     * elija fecha — el cost se calcula contra esta fecha automática.
+     */
+    private LocalDate nextAvailableDeliveryDate() {
+        LocalDate today = LocalDate.now();
+        for (int i = 0; i < 14; i++) {
+            LocalDate date = today.plusDays(i);
+            DayOfWeek dow = date.getDayOfWeek();
+            if ((dow == DayOfWeek.WEDNESDAY || dow == DayOfWeek.FRIDAY)
+                    && deliveryScheduleService.isWithinWindow(date)) {
+                return date;
+            }
+        }
+        return today;
     }
 }

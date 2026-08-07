@@ -225,6 +225,15 @@ class OrderServiceSplitTest {
     void createDispatchesToCreateStockWhenDateNull() {
         OrderService svc = buildService();
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        // Override: usar "Retiro en Local" para que el date null sea válido en stock.
+        when(deliveryMethodRepository.findByIdAndActiveTrue(deliveryMethodId))
+                .thenReturn(Optional.of(DeliveryMethod.builder()
+                        .id(deliveryMethodId)
+                        .name("Envío Express")
+                        .cost(new BigDecimal("1200"))
+                        .appliesToOrderType(DeliveryMethodScope.STOCK)
+                        .active(true)
+                        .build()));
 
         OrderResponse resp = svc.create(userId, new CreateOrderRequest(
                 deliveryMethodId, null, null, null, null,

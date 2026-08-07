@@ -4,6 +4,7 @@ import com.distribuidora.dto.order.CreateOrderRequest;
 import com.distribuidora.dto.order.OrderResponse;
 import com.distribuidora.dto.order.UpdateOrderRequest;
 import com.distribuidora.dto.order.UpdateOrderStatusRequest;
+import com.distribuidora.exception.DeliveryMethodUnavailableException;
 import com.distribuidora.exception.InsufficientStockException;
 import com.distribuidora.exception.OrderInvalidTransitionException;
 import com.distribuidora.exception.OrderNotFoundException;
@@ -16,8 +17,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
+import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,6 +38,7 @@ class OrderServiceIntegrationTest {
     @Autowired OrderRepository orderRepository;
     @Autowired BusinessConfigRepository businessConfigRepository;
     @Autowired DeliveryWindowRepository deliveryWindowRepository;
+    @Autowired DeliveryScheduleService deliveryScheduleService;
 
     UUID customerId;
     UUID productId;
@@ -81,9 +85,9 @@ class OrderServiceIntegrationTest {
         productId = product.getId();
 
         DeliveryMethod dm = deliveryMethodRepository.save(DeliveryMethod.builder()
-                .name("Envío a Domicilio")
-                .cost(new BigDecimal("500"))
-                .appliesToOrderType(DeliveryMethodScope.BOTH)
+                .name("Envío Express")
+                .cost(new BigDecimal("1200"))
+                .appliesToOrderType(DeliveryMethodScope.STOCK)
                 .active(true)
                 .build());
         deliveryMethodId = dm.getId();
@@ -93,11 +97,16 @@ class OrderServiceIntegrationTest {
         return new CreateOrderRequest.OrderItemRequest(pid, packs);
     }
 
+    /** Fecha futura válida para "Envío a Domicilio" en pedidos de stock. */
+    private LocalDate stockDeliveryDate() {
+        return null;
+    }
+
     @Test
     void createStockDecrementsStock() {
         int before = productRepository.findById(productId).orElseThrow().getStock();
         OrderResponse resp = orderService.createStock(customerId, new CreateOrderRequest(
-                deliveryMethodId, null, "Calle 123", "+5411", "nota",
+                deliveryMethodId, stockDeliveryDate(), "Calle 123", "+5411", "nota",
                 List.of(item(productId, 3))    // 30 unidades
         ));
         assertThat(resp.type()).isEqualTo(OrderType.STOCK);
@@ -139,7 +148,7 @@ class OrderServiceIntegrationTest {
 
         assertThatThrownBy(() -> orderService.createStock(customerId, new CreateOrderRequest(
                 deliveryMethodId,
-                null,
+                stockDeliveryDate(),
                 null, null, null,
                 List.of(item(small.getId(), 10))
         )))
@@ -155,7 +164,7 @@ class OrderServiceIntegrationTest {
     @Test
     void invalidTransitionThrows() {
         OrderResponse created = orderService.createStock(customerId, new CreateOrderRequest(
-                deliveryMethodId, null, null, null, null,
+                deliveryMethodId, stockDeliveryDate(), null, null, null,
                 List.of(item(productId, 1))
         ));
 
@@ -168,7 +177,7 @@ class OrderServiceIntegrationTest {
     void cancelarStockRestauraStock() {
         int initialStock = productRepository.findById(productId).orElseThrow().getStock();
         OrderResponse created = orderService.createStock(customerId, new CreateOrderRequest(
-                deliveryMethodId, null, null, null, null,
+                deliveryMethodId, stockDeliveryDate(), null, null, null,
                 List.of(item(productId, 3))
         ));
         int stockCreated = productRepository.findById(productId).orElseThrow().getStock();
@@ -186,7 +195,7 @@ class OrderServiceIntegrationTest {
     @Test
     void fullFlowToEntregado() {
         OrderResponse created = orderService.createStock(customerId, new CreateOrderRequest(
-                deliveryMethodId, null, null, null, null,
+                deliveryMethodId, stockDeliveryDate(), null, null, null,
                 List.of(item(productId, 1))
         ));
         OrderResponse armado = orderService.transitionStatus(created.id(),
@@ -204,5 +213,49 @@ class OrderServiceIntegrationTest {
     void getNotFoundThrows() {
         assertThatThrownBy(() -> orderService.get(UUID.randomUUID()))
             .isInstanceOf(OrderNotFoundException.class);
+    }
+
+    @Test
+    void createStockRejectsWholesaleOnlyDeliveryMethod() {
+        // Forzamos el setup a crear un método wholesale-only con un id distinto
+        DeliveryMethod wholesaleOnly = deliveryMethodRepository.save(DeliveryMethod.builder()
+                .name("Envío a Domicilio Test")
+                .cost(new BigDecimal("500"))
+                .appliesToOrderType(DeliveryMethodScope.WHOLESALE)
+                .active(true)
+                .build());
+
+        assertThatThrownBy(() -> orderService.createStock(customerId, new CreateOrderRequest(
+                wholesaleOnly.getId(), null, null, null, null,
+                List.of(item(productId, 2))
+        )))
+                .isInstanceOf(DeliveryMethodUnavailableException.class)
+                .hasMessageContaining("Envío a Domicilio Test")
+                .hasMessageContaining("stock");
+    }
+
+    @Test
+    void createStockEnvioADomicilioCostsZeroOnWholesaleDay() {
+        // "Envío a Domicilio" en stock toma la próxima fecha Wed/Fri disponible
+        // y aplica la regla wholesale: gratis en Wed/Fri, $500 otros días.
+        DeliveryMethod domicilio = deliveryMethodRepository.save(DeliveryMethod.builder()
+                .name("Envío a Domicilio")
+                .cost(new BigDecimal("500"))
+                .appliesToOrderType(DeliveryMethodScope.BOTH)
+                .active(true)
+                .build());
+
+        OrderResponse resp = orderService.createStock(customerId, new CreateOrderRequest(
+                domicilio.getId(), null, "Calle 123", "+5411", null,
+                List.of(item(productId, 1))
+        ));
+
+        // El helper devuelve hoy (no hay windows en el test) → cost depende del día de hoy.
+        LocalDate today = LocalDate.now();
+        DayOfWeek dow = today.getDayOfWeek();
+        BigDecimal expected = (dow == DayOfWeek.WEDNESDAY || dow == DayOfWeek.FRIDAY)
+                ? BigDecimal.ZERO
+                : new BigDecimal("500.00");
+        assertThat(resp.deliveryCost()).isEqualByComparingTo(expected);
     }
 }

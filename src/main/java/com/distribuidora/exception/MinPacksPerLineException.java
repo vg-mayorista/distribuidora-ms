@@ -6,20 +6,22 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Alguna línea del pedido no alcanza el mínimo de packs por línea definido en
- * {@code BusinessConfig.minPacksPerLine}. El cliente tiene que sumar packs hasta
- * llegar al mínimo o cambiar el producto.
+ * Alguna línea del pedido no alcanza el mínimo de unidades físicas por línea
+ * definido en {@code BusinessConfig.minPacksPerLine}. El nombre del campo
+ * conserva "Packs" por compatibilidad con la migración, pero la regla real es
+ * "unidades físicas" (packs × unitsPerPack).
  *
  * <p>Regla: cada ítem del carrito debe tener al menos
- * {@link com.distribuidora.model.BusinessConfig#getMinPacksPerLine()} packs.
+ * {@link com.distribuidora.model.BusinessConfig#getMinPacksPerLine()} unidades
+ * físicas (no packs).
  */
 @Getter
 public class MinPacksPerLineException extends RuntimeException {
 
     private final List<OffendingLine> offending;
 
-    public MinPacksPerLineException(List<OffendingLine> offending, int minPacksPerLine) {
-        super(buildMessage(offending, minPacksPerLine));
+    public MinPacksPerLineException(List<OffendingLine> offending, int minUnitsPerLine) {
+        super(buildMessage(offending, minUnitsPerLine));
         this.offending = offending;
     }
 
@@ -27,15 +29,21 @@ public class MinPacksPerLineException extends RuntimeException {
         return offending;
     }
 
-    private static String buildMessage(List<OffendingLine> lines, int minPacksPerLine) {
+    private static String buildMessage(List<OffendingLine> lines, int minUnitsPerLine) {
         StringBuilder sb = new StringBuilder("Cada línea del pedido debe tener al menos ")
-                .append(minPacksPerLine)
-                .append(" packs. Líneas que no cumplen:");
+                .append(minUnitsPerLine)
+                .append(" unidades físicas. Líneas que no cumplen:");
         for (OffendingLine l : lines) {
-            sb.append(String.format(" %s (%d/%d);", l.productName(), l.requestedPacks(), minPacksPerLine));
+            sb.append(String.format(" %s (%d/%d u.);", l.productName(), l.requestedUnits(), minUnitsPerLine));
         }
         return sb.toString();
     }
 
-    public record OffendingLine(UUID productId, String productName, int requestedPacks, int minRequiredPacks) {}
+    public record OffendingLine(
+            UUID productId,
+            String productName,
+            int requestedUnits,
+            int requestedPacks,
+            int minRequiredUnits
+    ) {}
 }

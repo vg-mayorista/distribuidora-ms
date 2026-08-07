@@ -69,7 +69,7 @@ class ReportServiceIntegrationTest {
         productBId = b.getId();
 
         DeliveryMethod dm = deliveryMethodRepository.save(DeliveryMethod.builder()
-                .name("Envío").cost(new BigDecimal("100")).active(true).build());
+                .name("Envío Express").cost(new BigDecimal("100")).appliesToOrderType(DeliveryMethodScope.STOCK).active(true).build());
         deliveryMethodId = dm.getId();
 
         // Seed a delivery window that allows ALL days (cutoffDow == deliveryDow, 1 minute from now).
