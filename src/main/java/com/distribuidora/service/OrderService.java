@@ -193,7 +193,7 @@ public class OrderService {
         if ("Envío a Domicilio".equalsIgnoreCase(dm.getName())) {
             cost = computeDeliveryCost(dm, nextAvailableDeliveryDate());
         } else {
-            cost = dm.getCost();
+            cost = dm.getCost() != null ? dm.getCost() : BigDecimal.ZERO;
         }
 
         Order order = Order.builder()
@@ -286,7 +286,7 @@ public class OrderService {
         if (dm != null) {
             order.setDeliveryMethodId(dm.getId());
             order.setDeliveryMethodName(dm.getName());
-            order.setDeliveryCost(dm.getCost());
+            order.setDeliveryCost(computeDeliveryCost(dm, order.getDeliveryDate()));
         }
         if (req.deliveryAddress() != null) order.setDeliveryAddress(req.deliveryAddress());
         if (req.deliveryPhone() != null) order.setDeliveryPhone(req.deliveryPhone());
@@ -352,7 +352,7 @@ public class OrderService {
         if (dm != null) {
             order.setDeliveryMethodId(dm.getId());
             order.setDeliveryMethodName(dm.getName());
-            order.setDeliveryCost(dm.getCost());
+            order.setDeliveryCost(computeDeliveryCost(dm, nextAvailableDeliveryDate()));
         }
         order.setDeliveryDate(null);
         if (req.deliveryAddress() != null) order.setDeliveryAddress(req.deliveryAddress());
@@ -446,6 +446,13 @@ public class OrderService {
             assertDeliveryDateInWindow(deliveryDate);
         }
         order.setDeliveryDate(deliveryDate);
+        deliveryMethodRepository.findById(order.getDeliveryMethodId()).ifPresent(dm -> {
+            BigDecimal newCost = computeDeliveryCost(dm, deliveryDate);
+            order.setDeliveryCost(newCost);
+            if (order.getSubtotal() != null) {
+                order.setTotal(order.getSubtotal().add(newCost).setScale(2, RoundingMode.HALF_UP));
+            }
+        });
         return toResponse(order);
     }
 
@@ -455,11 +462,12 @@ public class OrderService {
         for (OrderItem item : order.getItems()) {
             Product p = productRepository.findById(item.getProductId())
                     .orElseThrow(() -> new ProductNotFoundException(item.getProductId()));
-            int newStock = p.getStock() - item.getQuantity();
+            int currentStock = p.getStock() != null ? p.getStock() : 0;
+            int newStock = currentStock - item.getQuantity();
             if (newStock < 0) {
                 throw new OrderNotEditableException(
                         "Stock insuficiente para " + p.getName() + " (disponible: "
-                                + p.getStock() + ", requerido: " + item.getQuantity() + ")");
+                                + currentStock + ", requerido: " + item.getQuantity() + ")");
             }
             p.setStock(newStock);
         }
@@ -467,8 +475,10 @@ public class OrderService {
 
     private void restoreStockForOrder(Order order) {
         for (OrderItem item : order.getItems()) {
-            productRepository.findById(item.getProductId()).ifPresent(p ->
-                    p.setStock(p.getStock() + item.getQuantity()));
+            productRepository.findById(item.getProductId()).ifPresent(p -> {
+                int currentStock = p.getStock() != null ? p.getStock() : 0;
+                p.setStock(currentStock + item.getQuantity());
+            });
         }
     }
 
@@ -726,16 +736,16 @@ public class OrderService {
 
     /**
      * Costo final del envío. "Envío a Domicilio" es gratis cuando la entrega
-     * cae en miércoles o viernes (los días de reparto del flujo mayorista);
-     * cualquier otro día se cobra el costo base del método.
+     * cae en miércoles o viernes (días de reparto del flujo mayorista) o cuando
+     * la fecha es nula en el flujo mayorista.
      */
     private BigDecimal computeDeliveryCost(DeliveryMethod dm, LocalDate deliveryDate) {
-        BigDecimal baseCost = dm.getCost();
-        if (deliveryDate == null) return baseCost;
-        DayOfWeek dow = deliveryDate.getDayOfWeek();
-        if ("Envío a Domicilio".equalsIgnoreCase(dm.getName())
-                && (dow == DayOfWeek.WEDNESDAY || dow == DayOfWeek.FRIDAY)) {
-            return BigDecimal.ZERO;
+        if (dm == null) return BigDecimal.ZERO;
+        BigDecimal baseCost = dm.getCost() != null ? dm.getCost() : BigDecimal.ZERO;
+        if ("Envío a Domicilio".equalsIgnoreCase(dm.getName())) {
+            if (deliveryDate == null || deliveryDate.getDayOfWeek() == DayOfWeek.WEDNESDAY || deliveryDate.getDayOfWeek() == DayOfWeek.FRIDAY) {
+                return BigDecimal.ZERO;
+            }
         }
         return baseCost;
     }
