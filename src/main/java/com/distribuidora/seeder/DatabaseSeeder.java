@@ -181,6 +181,13 @@ public class DatabaseSeeder implements CommandLineRunner {
    * valor inválido, tira antes de que podamos remediarla desde el entity.
    */
   private void backfillMissingScope() {
+    // 0. Asegurar que la columna exista. En Render la tabla se creó sin la
+    // columna (Hibernate `ddl-auto: update` no la había agregado todavía al
+    // momento de un deploy viejo), por lo que cualquier UPDATE/CHECK abajo
+    // fallaba con "column does not exist" y rompía el startup. La creamos
+    // idempotentemente con DEFAULT 'BOTH' para no tocar filas existentes.
+    ensureColumnExists();
+
     // 1. Normalizar NULLs y valores fuera del enum a 'BOTH'.
     int updated = jdbcTemplate.update(
         "UPDATE delivery_methods " +
@@ -202,11 +209,98 @@ public class DatabaseSeeder implements CommandLineRunner {
       );
       System.out.println("[seeder] Added missing CHECK constraint delivery_methods_scope_check");
     } catch (Exception e) {
-      // Ya existe → ignorar. Cualquier otro error sí debería propagarse.
-      if (!e.getMessage().toLowerCase().contains("already exists")) {
+      // Ya existe → ignorar (true en Postgres "already exists", en H2 puede
+      // variar). Recorremos la cadena de causas para detectar el caso.
+      if (!isConstraintAlreadyExistsError(e)) {
         throw e;
       }
     }
+  }
+
+  /**
+   * Detecta si una excepción JDBC corresponde a "constraint ya existe" en
+   * Postgres o H2. Recorre la cadena de causas porque Spring envuelve el error
+   * original en {@code BadSqlGrammarException}.
+   */
+  private boolean isConstraintAlreadyExistsError(Throwable t) {
+    while (t != null) {
+      String msg = t.getMessage();
+      if (msg != null) {
+        String lower = msg.toLowerCase();
+        if (lower.contains("already exists")) {       // Postgres / H2 english
+          return true;
+        }
+      }
+      t = t.getCause();
+    }
+    return false;
+  }
+
+  /**
+   * Garantiza que {@code delivery_methods.applies_to_order_type} exista. La crea
+   * con DEFAULT 'BOTH' NOT NULL si falta. Idempotente.
+   *
+   * <p>Necesario porque en despliegues viejos la tabla se creó antes de que la
+   * entidad JPA tuviera este campo, y {@code ddl-auto: update} no llegó a
+   * agregarlo. Cualquier intento de UPDATE sobre la columna tira
+   * {@code column "applies_to_order_type" does not exist} y rompe el startup.
+   *
+   * <p>Usa try/catch sobre el propio ALTER en lugar de consultar
+   * {@code information_schema}, porque H2 (test) tiene quirks de mayúsculas
+   * que hacían fallar la detección incluso cuando la columna existía.
+   */
+  private void ensureColumnExists() {
+    // 1. Intentar agregar la columna nullable con default. Si ya existe,
+    //    capturamos el error y seguimos.
+    boolean added = false;
+    try {
+      jdbcTemplate.execute(
+          "ALTER TABLE delivery_methods " +
+          "ADD COLUMN applies_to_order_type VARCHAR(20) DEFAULT 'BOTH'"
+      );
+      added = true;
+    } catch (Exception e) {
+      // Duplicate column → ya existe. Ignorar.
+      if (!isDuplicateColumnError(e)) {
+        throw e;
+      }
+    }
+
+    if (added) {
+      System.out.println("[seeder] Column delivery_methods.applies_to_order_type missing → created");
+      // Llenar NULLs que pudieran existir antes (defensa, normalmente 0).
+      jdbcTemplate.update(
+          "UPDATE delivery_methods SET applies_to_order_type = 'BOTH' " +
+          "WHERE applies_to_order_type IS NULL"
+      );
+      // Reconciliación histórica: cualquier método "Express" debería ser STOCK,
+      // coherente con la migration V1.
+      jdbcTemplate.update(
+          "UPDATE delivery_methods SET applies_to_order_type = 'STOCK' " +
+          "WHERE name ILIKE '%express%' AND applies_to_order_type = 'BOTH'"
+      );
+    }
+  }
+
+  /**
+   * Detecta si una excepción JDBC corresponde a un "duplicate column" en Postgres
+   * o H2. Recorre la cadena de causas porque Spring envuelve el error original.
+   */
+  private boolean isDuplicateColumnError(Throwable t) {
+    while (t != null) {
+      String msg = t.getMessage();
+      if (msg != null) {
+        String lower = msg.toLowerCase();
+        if (lower.contains("already exists")        // Postgres
+            || lower.contains("duplicate column")   // H2 english
+            || lower.contains("columna duplicada")  // H2 español
+            || lower.contains("ya existe")) {       // Postgres español
+          return true;
+        }
+      }
+      t = t.getCause();
+    }
+    return false;
   }
 
   /**
