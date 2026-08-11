@@ -18,6 +18,7 @@ import com.distribuidora.repository.UserRepository;
 import com.distribuidora.service.BusinessConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,7 @@ public class DatabaseSeeder implements CommandLineRunner {
   private final BusinessConfigRepository businessConfigRepository;
   private final DeliveryWindowRepository deliveryWindowRepository;
   private final PasswordEncoder passwordEncoder;
+  private final JdbcTemplate jdbcTemplate;
 
   @Override
   @Transactional
@@ -141,6 +143,12 @@ public class DatabaseSeeder implements CommandLineRunner {
   }
 
   private void seedDeliveryMethods() {
+    // Defensive backfill: en bases de datos creadas antes de que existiera
+    // el campo `applies_to_order_type`, Hibernate con `ddl-auto: update` pudo
+    // dejar la columna con NULL en filas existentes, causando 500 al listar.
+    // Normalizamos cualquier valor NULL/inválido a BOTH antes de sembrar.
+    backfillMissingScope();
+
     if (deliveryMethodRepository.count() > 0) return;
     deliveryMethodRepository.save(DeliveryMethod.builder()
         .name("Retiro en Local").cost(BigDecimal.ZERO).estimatedDays(1)
@@ -151,6 +159,54 @@ public class DatabaseSeeder implements CommandLineRunner {
     deliveryMethodRepository.save(DeliveryMethod.builder()
         .name("Envío Express").cost(new BigDecimal("1200.00")).estimatedDays(1)
         .appliesToOrderType(DeliveryMethodScope.STOCK).active(true).build());
+  }
+
+  /**
+   * Recorre todos los métodos de entrega y, si alguno tiene {@code appliesToOrderType}
+   * con un valor que no está en el enum (datos huérfanos), lo corrige a {@code BOTH}.
+   *
+   * <p>Esto compensa dos cosas que pueden haber pasado en despliegues viejos:
+   * <ul>
+   *   <li>La columna se agregó con Hibernate {@code ddl-auto: update} antes de
+   *       que el enum existiera como tal → NULL en filas viejas (Hibernate lo
+   *       deserializa como null sin tirar excepción).</li>
+   *   <li>El CHECK constraint que limita a WHOLESALE|STOCK|BOTH nunca se creó
+   *       automáticamente (las migrations no se ejecutan: solo se monta
+   *       {@code db/init/} en docker-entrypoint-initdb.d). Esto permite que
+   *       queden valores huérfanos que Hibernate NO PUEDE deserializar al
+   *       enum, tirando {@code IllegalArgumentException} y devolviendo 500.</li>
+   * </ul>
+   *
+   * <p>Se hace con SQL crudo porque si Hibernate intenta leer una fila con un
+   * valor inválido, tira antes de que podamos remediarla desde el entity.
+   */
+  private void backfillMissingScope() {
+    // 1. Normalizar NULLs y valores fuera del enum a 'BOTH'.
+    int updated = jdbcTemplate.update(
+        "UPDATE delivery_methods " +
+        "SET applies_to_order_type = 'BOTH' " +
+        "WHERE applies_to_order_type IS NULL " +
+        "   OR applies_to_order_type NOT IN ('WHOLESALE', 'STOCK', 'BOTH')"
+    );
+    if (updated > 0) {
+      System.out.println("[seeder] Backfilled " + updated + " rows in delivery_methods.applies_to_order_type → BOTH");
+    }
+
+    // 2. Asegurar que el CHECK constraint exista (idempotente). Si la migration
+    // V1 nunca corrió, este guard es la red de seguridad.
+    try {
+      jdbcTemplate.execute(
+          "ALTER TABLE delivery_methods " +
+          "ADD CONSTRAINT delivery_methods_scope_check " +
+          "CHECK (applies_to_order_type IN ('WHOLESALE', 'STOCK', 'BOTH'))"
+      );
+      System.out.println("[seeder] Added missing CHECK constraint delivery_methods_scope_check");
+    } catch (Exception e) {
+      // Ya existe → ignorar. Cualquier otro error sí debería propagarse.
+      if (!e.getMessage().toLowerCase().contains("already exists")) {
+        throw e;
+      }
+    }
   }
 
   /**

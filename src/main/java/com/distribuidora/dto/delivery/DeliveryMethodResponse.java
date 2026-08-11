@@ -44,7 +44,10 @@ public record DeliveryMethodResponse(
             dm.getCost(),
             dm.getEstimatedDays(),
             dm.getActive(),
-            dm.getAppliesToOrderType(),
+            // Defensive: si el valor quedó NULL en la DB por una migración
+            // incompleta, lo normalizamos a BOTH para que el response nunca
+            // devuelva null en un campo no-nullable.
+            dm.getAppliesToOrderType() != null ? dm.getAppliesToOrderType() : DeliveryMethodScope.BOTH,
             dm.getCreatedAt(),
             dm.getUpdatedAt()
         );
