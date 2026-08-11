@@ -181,6 +181,13 @@ public class DatabaseSeeder implements CommandLineRunner {
    * valor inválido, tira antes de que podamos remediarla desde el entity.
    */
   private void backfillMissingScope() {
+    // 0. Asegurar que la columna exista. En Render la tabla se creó sin la
+    // columna (Hibernate `ddl-auto: update` no la había agregado todavía al
+    // momento de un deploy viejo), por lo que cualquier UPDATE/CHECK abajo
+    // fallaba con "column does not exist" y rompía el startup. La creamos
+    // idempotentemente con DEFAULT 'BOTH' para no tocar filas existentes.
+    ensureColumnExists();
+
     // 1. Normalizar NULLs y valores fuera del enum a 'BOTH'.
     int updated = jdbcTemplate.update(
         "UPDATE delivery_methods " +
@@ -207,6 +214,40 @@ public class DatabaseSeeder implements CommandLineRunner {
         throw e;
       }
     }
+  }
+
+  /**
+   * Garantiza que {@code delivery_methods.applies_to_order_type} exista. La crea
+   * con DEFAULT 'BOTH' NOT NULL si falta. Idempotente.
+   *
+   * <p>Necesario porque en despliegues viejos la tabla se creó antes de que la
+   * entidad JPA tuviera este campo, y {@code ddl-auto: update} no llegó a
+   * agregarlo. Cualquier intento de UPDATE sobre la columna tira
+   * {@code column "applies_to_order_type" does not exist} y rompe el startup.
+   */
+  private void ensureColumnExists() {
+    Boolean exists = jdbcTemplate.queryForObject(
+        "SELECT EXISTS (" +
+        "  SELECT 1 FROM information_schema.columns " +
+        "  WHERE table_schema = current_schema() " +
+        "    AND table_name = 'delivery_methods' " +
+        "    AND column_name = 'applies_to_order_type'" +
+        ")",
+        Boolean.class
+    );
+    if (Boolean.TRUE.equals(exists)) return;
+
+    System.out.println("[seeder] Column delivery_methods.applies_to_order_type missing → creating it");
+    jdbcTemplate.execute(
+        "ALTER TABLE delivery_methods " +
+        "ADD COLUMN applies_to_order_type VARCHAR(20) NOT NULL DEFAULT 'BOTH'"
+    );
+    // Reconciliación histórica: cualquier método "Express" debería ser STOCK,
+    // coherente con la migration V1. Idempotente.
+    jdbcTemplate.update(
+        "UPDATE delivery_methods SET applies_to_order_type = 'STOCK' " +
+        "WHERE name ILIKE '%express%' AND applies_to_order_type = 'BOTH'"
+    );
   }
 
   /**
