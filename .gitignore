@@ -36,6 +36,9 @@ build/
 .pi/
 # (track openspec/ and docs/ — used to record change proposals and architecture)
 
+# Local planning notes (not for commit)
+.plans/
+
 
 # Temporary execution files
 run_details.json
