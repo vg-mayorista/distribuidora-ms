@@ -7,6 +7,7 @@ import com.distribuidora.exception.DeliveryMethodNotFoundException;
 import com.distribuidora.exception.DuplicateDeliveryMethodException;
 import com.distribuidora.mapper.DeliveryMethodMapper;
 import com.distribuidora.model.DeliveryMethod;
+import com.distribuidora.model.DeliveryMethodScope;
 import com.distribuidora.repository.DeliveryMethodRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -73,7 +74,7 @@ class DeliveryMethodServiceTest {
     @Test
     void create_ok() {
         var req = new CreateDeliveryMethodRequest("Envío Express",
-            new BigDecimal("150.00"), 3);
+            new BigDecimal("150.00"), 3, DeliveryMethodScope.BOTH);
         when(repository.existsByName("Envío Express")).thenReturn(false);
         when(mapper.toEntity(req)).thenReturn(dm);
         when(repository.save(any(DeliveryMethod.class))).thenReturn(dm);
@@ -87,7 +88,7 @@ class DeliveryMethodServiceTest {
     @Test
     void create_duplicateName_throws() {
         var req = new CreateDeliveryMethodRequest("Envío Express",
-            new BigDecimal("150.00"), 3);
+            new BigDecimal("150.00"), 3, DeliveryMethodScope.BOTH);
         when(repository.existsByName("Envío Express")).thenReturn(true);
 
         assertThatThrownBy(() -> service.create(req))
@@ -155,7 +156,7 @@ class DeliveryMethodServiceTest {
     @Test
     void update_ok() {
         var req = new UpdateDeliveryMethodRequest("Envío Premium",
-            new BigDecimal("200.00"), 5);
+            new BigDecimal("200.00"), 5, DeliveryMethodScope.BOTH);
         when(repository.findByIdAndActiveTrue(dmId)).thenReturn(Optional.of(dm));
         when(repository.existsByNameAndIdNot("Envío Premium", dmId)).thenReturn(false);
         // applyUpdate is void; make the mock actually mutate the entity
@@ -178,7 +179,7 @@ class DeliveryMethodServiceTest {
     @Test
     void update_notFound_throws() {
         var req = new UpdateDeliveryMethodRequest("Envío Premium",
-            new BigDecimal("200.00"), 5);
+            new BigDecimal("200.00"), 5, DeliveryMethodScope.BOTH);
         when(repository.findByIdAndActiveTrue(dmId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.update(dmId, req))
@@ -188,7 +189,7 @@ class DeliveryMethodServiceTest {
     @Test
     void update_duplicateName_throws() {
         var req = new UpdateDeliveryMethodRequest("Envío Express",
-            new BigDecimal("200.00"), 5);
+            new BigDecimal("200.00"), 5, DeliveryMethodScope.BOTH);
         when(repository.findByIdAndActiveTrue(dmId)).thenReturn(Optional.of(dm));
         when(repository.existsByNameAndIdNot("Envío Express", dmId)).thenReturn(true);
 
@@ -200,7 +201,7 @@ class DeliveryMethodServiceTest {
 
     @Test
     void patch_partial_ok() {
-        var req = new PatchDeliveryMethodRequest(null, new BigDecimal("180.00"), null);
+        var req = new PatchDeliveryMethodRequest(null, new BigDecimal("180.00"), null, null);
         when(repository.findByIdAndActiveTrue(dmId)).thenReturn(Optional.of(dm));
         // applyPatch is void; make the mock actually mutate the entity
         doAnswer(inv -> {
@@ -220,7 +221,7 @@ class DeliveryMethodServiceTest {
 
     @Test
     void patch_nameChange_validatesUniqueness() {
-        var req = new PatchDeliveryMethodRequest("Nuevo Nombre", null, null);
+        var req = new PatchDeliveryMethodRequest("Nuevo Nombre", null, null, null);
         when(repository.findByIdAndActiveTrue(dmId)).thenReturn(Optional.of(dm));
         when(repository.existsByNameAndIdNot("Nuevo Nombre", dmId)).thenReturn(true);
 

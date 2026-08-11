@@ -1,5 +1,6 @@
 package com.distribuidora.dto.delivery;
 
+import com.distribuidora.model.DeliveryMethodScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -29,5 +30,10 @@ public record UpdateDeliveryMethodRequest(
     @Schema(description = "Días hábiles estimados para la entrega", example = "3", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull
     @Min(0)
-    Integer estimatedDays
+    Integer estimatedDays,
+
+    @Schema(description = "A qué flujos aplica el método.",
+            example = "BOTH",
+            allowableValues = {"WHOLESALE", "STOCK", "BOTH"})
+    DeliveryMethodScope appliesToOrderType
 ) {}
