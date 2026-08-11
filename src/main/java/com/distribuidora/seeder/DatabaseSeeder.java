@@ -21,7 +21,6 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -44,7 +43,6 @@ public class DatabaseSeeder implements CommandLineRunner {
   private final JdbcTemplate jdbcTemplate;
 
   @Override
-  @Transactional
   public void run(String... args) {
     seedRoles();
     seedUsers();
@@ -260,7 +258,8 @@ public class DatabaseSeeder implements CommandLineRunner {
       );
       added = true;
     } catch (Exception e) {
-      // Duplicate column → ya existe. Ignorar.
+      // Duplicate column → ya existe. Ignorar. (Spring envuelve el SQLException
+      // en BadSqlGrammarException; recorremos la cadena para detectar el caso.)
       if (!isDuplicateColumnError(e)) {
         throw e;
       }
