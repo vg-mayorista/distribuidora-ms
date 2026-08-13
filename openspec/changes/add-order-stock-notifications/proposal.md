@@ -60,13 +60,11 @@ envío posterior (no existe ni siquiera el concepto de "notificación enviada").
   sandbox de Twilio solo podemos mandar a números que mandaron `join` (ok
   para dev, no para prod).
 
-## Estado de la sesión 2026-08-11
+## Estado de la sesión 2026-08-13
 
-- ✅ Cuenta Twilio creada y validada por API (status `active`, type `Trial`).
-- ✅ Auth Token: primary rotado, en uso el **secondary**.
-- ✅ WhatsApp Sandbox conectado (`+1 415 523 8886`, frase
-  `join cook-frequently`).
-- ✅ Mensaje de prueba recibido.
-- ⏳ Pendiente: implementación Java, MailHog local, templates propios en Meta.
+- ✅ Cuenta Twilio conectada y validada en desarrollo y producción (Render).
+- ✅ Notificaciones por WhatsApp mediante Twilio API **100% Verificadas y Operativas**.
+- ✅ Historial, métricas y reintento manual implementados y probados.
+- ✅ Guía para modificar número de recepción y roles de ventas integrada en la especificación SDD (`openspec/specs/notifications/spec.md`).
 
 Plan operativo completo en `.plans/order-stock-notifications.md` (gitignored).

@@ -135,3 +135,43 @@ Campos nuevos en `BusinessConfig`:
 - El endpoint `POST /api/orders/stock` mantiene su contrato actual de
   respuesta (`201 Created` con `OrderResponse`) — las notificaciones son
   efecto colateral, no parte del response.
+
+---
+
+## Estado del Sistema
+
+- **Estado**: ✅ **Verificado y Operativo** en producción/staging (Render).
+- **Validación**: Envíos de WhatsApp procesados y entregados con éxito a través de la API oficial de Twilio SDK ante la creación de pedidos `OrderType.STOCK`.
+- **Resiliencia**: Captura de errores, retries automáticos con `@Retryable` e historial registrado en `notification_logs`.
+
+---
+
+## Guía de Configuración de Destinatarios (Gestión de Ventas)
+
+Para dirigir las notificaciones de pedidos express a la persona responsable del área de ventas o cambiar el número de recepción, el sistema ofrece tres mecanismos dinámicos (sin necesidad de recompilar ni hacer redeploy):
+
+### Opción 1 — Actualizar el número de teléfono del usuario responsable
+Los usuarios con roles habilitados (default: `ROLE_ADMIN`, `ROLE_DISTRIBUTOR`) reciben notificaciones. Para asignar el celular de la persona de Ventas:
+- **Vía API / Panel**: Actualizar el campo `phone` del usuario correspondiente (ej. `+5493704516054`).
+- **Vía SQL**:
+  ```sql
+  UPDATE users SET phone = '+549XXXXXXXXXX' WHERE email = 'ventas@distribuidora.com';
+  ```
+El `ArgentinePhoneNormalizer` formateará automáticamente cualquier formato argentino a E.164 (`+549XXXXXXXXXX`).
+
+### Opción 2 — Cambiar los roles receptores (`notify_roles_csv`)
+Si se crea un rol específico para el encargado de ventas (ejemplo: `ROLE_SALES` o `ROLE_VENTAS`), se puede modificar la configuración global en `BusinessConfig`:
+- **Vía API Admin**: `PUT /api/config/business` especificando `notifyRolesCsv = "ROLE_VENTAS"`.
+- **Vía SQL**:
+  ```sql
+  UPDATE business_config SET notify_roles_csv = 'ROLE_VENTAS,ROLE_ADMIN';
+  ```
+Todos los usuarios activos con ese rol recibirán automáticamente las notificaciones.
+
+### Opción 3 — Asignar un usuario específico por UUID (`notify_user_ids_csv`)
+Si se desea notificar a una persona en particular sin importar su rol global:
+- Cargar el UUID del usuario de ventas en `BusinessConfig.notify_user_ids_csv`:
+  ```sql
+  UPDATE business_config SET notify_user_ids_csv = 'a4d3caf6-de98-40ad-b031-cd4db6736d6c';
+  ```
+El resolver de destinatarios (`NotificationRecipientResolver`) incluirá al usuario deduplicando la lista.
