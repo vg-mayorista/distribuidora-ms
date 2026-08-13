@@ -14,92 +14,92 @@ Status legend: `[x]` done · `[~]` in progress · `[ ]` pending
 
 ## Phase N1 — Dependencias y configuración base
 
-- [ ] `pom.xml`: agregar `spring-boot-starter-mail`,
+- [x] `pom.xml`: agregar `spring-boot-starter-mail`,
       `com.twilio.sdk:twilio 10.7.0`, `spring-retry`, `spring-aspects`.
-- [ ] `application.yml`: bloque `spring.mail.*` + `notify.*`.
-- [ ] `notification/config/NotificationProperties.java`
+- [x] `application.yml`: bloque `spring.mail.*` + `notify.*`.
+- [x] `notification/config/NotificationProperties.java`
       (`@ConfigurationProperties("notify")`).
-- [ ] `notification/config/AsyncConfig.java` (`@EnableAsync` +
+- [x] `notification/config/AsyncConfig.java` (`@EnableAsync` +
       `ThreadPoolTaskExecutor`).
-- [ ] `notification/config/RetryConfig.java` (`@EnableRetry`).
+- [x] `notification/config/RetryConfig.java` (`@EnableRetry`).
 
 ## Phase N2 — Modelo de datos
 
-- [ ] `model/BusinessConfig.java`: +5 columnas
+- [x] `model/BusinessConfig.java`: +5 columnas
       (`notifyRolesCsv`, `notifyUserIdsCsv`, `notifyWhatsappEnabled`,
       `notifyEmailEnabled`, `notifyOnStockOrderCreated`) + helper
       `getNotifyRoles()`.
-- [ ] `notification/domain/NotificationChannel.java` (enum).
-- [ ] `notification/domain/NotificationTrigger.java` (enum).
-- [ ] `notification/domain/NotificationStatus.java` (enum).
-- [ ] `notification/domain/NotificationLog.java` (entidad JPA).
-- [ ] `notification/repository/NotificationLogRepository.java`.
-- [ ] `repository/UserRepository.java`: query
+- [x] `notification/domain/NotificationChannel.java` (enum).
+- [x] `notification/domain/NotificationTrigger.java` (enum).
+- [x] `notification/domain/NotificationStatus.java` (enum).
+- [x] `notification/domain/NotificationLog.java` (entidad JPA).
+- [x] `notification/repository/NotificationLogRepository.java`.
+- [x] `repository/UserRepository.java`: query
       `findActiveByRoleNames(Collection<String>)`.
-- [ ] `seeder/DatabaseSeeder.java`: defaults en `true` para los flags.
+- [x] `seeder/DatabaseSeeder.java`: defaults en `true` para los flags.
 
 ## Phase N3 — Canal Email (primera iteración funcional)
 
-- [ ] `notification/service/channel/NotificationChannelSender.java` (interface).
-- [ ] `notification/service/channel/EmailSender.java` (Spring Mail).
-- [ ] `notification/service/template/OrderNotificationRenderer.java`
+- [x] `notification/service/channel/NotificationChannelSender.java` (interface).
+- [x] `notification/service/channel/EmailSender.java` (Spring Mail).
+- [x] `notification/service/template/OrderNotificationRenderer.java`
       (genera subject + body HTML + texto plano).
-- [ ] `resources/messages.properties` (templates parametrizados).
-- [ ] Levantar MailHog local (`docker run -p 1025:1025 -p 8025:8025 mailhog/mailhog`).
-- [ ] Test end-to-end: crear pedido STOCK → verificar que llega mail al
+- [x] `resources/messages.properties` (templates parametrizados).
+- [x] Levantar MailHog local (`docker run -p 1025:1025 -p 8025:8025 mailhog/mailhog`).
+- [x] Test end-to-end: crear pedido STOCK → verificar que llega mail al
       admin / distribuidor y queda row en `notification_log`.
 
 ## Phase N4 — Disparador desacoplado
 
-- [ ] `notification/service/event/OrderNotificationEvent.java`
+- [x] `notification/service/event/OrderNotificationEvent.java`
       (ApplicationEvent).
-- [ ] `notification/service/event/OrderNotificationListener.java`
+- [x] `notification/service/event/OrderNotificationListener.java`
       (`@TransactionalEventListener(AFTER_COMMIT)` + `@Async`).
-- [ ] `service/OrderService.java`: inyectar `ApplicationEventPublisher`,
+- [x] `service/OrderService.java`: inyectar `ApplicationEventPublisher`,
       publicar evento post-`save` en `createStock`.
 
 ## Phase N5 — Resolución de destinatarios
 
-- [ ] `notification/recipient/NotificationRecipientResolver.java`:
+- [x] `notification/recipient/NotificationRecipientResolver.java`:
       une users por roles + ids extra, deduplica, filtra `active = true`.
 
 ## Phase N6 — Canal WhatsApp
 
-- [ ] `notification/service/channel/WhatsAppSender.java` (Twilio SDK).
-- [ ] Normalizador de teléfonos ARG (`+549XXXXXXXXXX`).
-- [ ] Crear template utility `vg_pedido_express_recibido` en Meta Business
+- [x] `notification/service/channel/WhatsAppSender.java` (Twilio SDK).
+- [x] Normalizador de teléfonos ARG (`+549XXXXXXXXXX`).
+- [x] Crear template utility `vg_pedido_express_recibido` en Meta Business
       Manager y obtener `Template SID` (~24 h aprobación).
-- [ ] Cargar SID en `messages.properties`.
-- [ ] Test end-to-end: crear pedido STOCK → WhatsApp llega al admin /
+- [x] Cargar SID en `messages.properties`.
+- [x] Test end-to-end: crear pedido STOCK → WhatsApp llega al admin /
       distribuidor.
 
 ## Phase N7 — Orquestación y resiliencia
 
-- [ ] `notification/service/NotificationService.java` (entry point).
-- [ ] `notification/service/NotificationDispatcher.java` (fan-out
+- [x] `notification/service/NotificationService.java` (entry point).
+- [x] `notification/service/NotificationDispatcher.java` (fan-out
       recipient × channel).
-- [ ] `@Retryable` en cada `send()` con
+- [x] `@Retryable` en cada `send()` con
       `maxAttempts = ${notify.retry.max-attempts}` y
       `backoff = 2s × multiplier 2.0`.
-- [ ] `@Async("notificationExecutor")` en el listener.
+- [x] `@Async("notificationExecutor")` en el listener.
 
 ## Phase N8 — Endpoints admin
 
-- [ ] `notification/controller/AdminNotificationController.java`.
-- [ ] `notification/dto/NotificationLogResponse.java`.
-- [ ] `notification/exception/NotificationDeliveryException.java`.
-- [ ] Filtros por `status`, `orderId`, `channel`. Paginación.
+- [x] `notification/controller/AdminNotificationController.java`.
+- [x] `notification/dto/NotificationLogResponse.java`.
+- [x] `notification/exception/NotificationDeliveryException.java`.
+- [x] Filtros por `status`, `orderId`, `channel`. Paginación.
 
 ## Phase N9 — Tests
 
-- [ ] Unit: `OrderNotificationListenerTest` (mock dispatcher, verifica que
+- [x] Unit: `OrderNotificationListenerTest` (mock dispatcher, verifica que
       no dispara para `WHOLESALE`).
-- [ ] Unit: `WhatsAppSender.normalizeArPhone` con casos
+- [x] Unit: `WhatsAppSender.normalizeArPhone` con casos
       (`1145678900`, `+5491156789000`, `15-4567-8900`, `null`).
-- [ ] Unit: `NotificationRecipientResolver` (dedup roles + ids extra).
-- [ ] Integration (H2): crear pedido STOCK → 2 rows en `notification_log`
+- [x] Unit: `NotificationRecipientResolver` (dedup roles + ids extra).
+- [x] Integration (H2): crear pedido STOCK → 2 rows en `notification_log`
       (1 email + 1 WA por destinatario).
-- [ ] Integration: `POST /api/admin/notifications/{id}/retry`.
+- [x] Integration: `POST /api/admin/notifications/{id}/retry`.
 
 ## Backlog (no implementado en este PR)
 
