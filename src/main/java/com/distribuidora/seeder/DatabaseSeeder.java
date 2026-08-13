@@ -113,22 +113,34 @@ public class DatabaseSeeder implements CommandLineRunner {
 
   private void seedUsers() {
     userRepository.findByEmail("admin@distribuidora.com").ifPresentOrElse(
-        u -> { if (!u.getActive()) { u.setActive(true); userRepository.save(u); } },
+        u -> {
+          boolean updated = false;
+          if (!u.getActive()) { u.setActive(true); updated = true; }
+          if (u.getPhone() == null || u.getPhone().isBlank()) { u.setPhone("+5493704516054"); updated = true; }
+          if (updated) userRepository.save(u);
+        },
         () -> userRepository.save(User.builder()
             .email("admin@distribuidora.com")
             .password(passwordEncoder.encode("admin123"))
             .firstName("Admin")
             .lastName("Distribuidora")
+            .phone("+5493704516054")
             .role(roleRepository.findByName("ROLE_ADMIN").orElseThrow())
             .active(true).build()));
 
     userRepository.findByEmail("distribuidor@distribuidora.com").ifPresentOrElse(
-        u -> { if (!u.getActive()) { u.setActive(true); userRepository.save(u); } },
+        u -> {
+          boolean updated = false;
+          if (!u.getActive()) { u.setActive(true); updated = true; }
+          if (u.getPhone() == null || u.getPhone().isBlank()) { u.setPhone("+5493704516054"); updated = true; }
+          if (updated) userRepository.save(u);
+        },
         () -> userRepository.save(User.builder()
             .email("distribuidor@distribuidora.com")
             .password(passwordEncoder.encode("distribuidor123"))
             .firstName("Dueño")
             .lastName("Distribuidora")
+            .phone("+5493704516054")
             .role(roleRepository.findByName("ROLE_DISTRIBUTOR").orElseThrow())
             .active(true).build()));
 
