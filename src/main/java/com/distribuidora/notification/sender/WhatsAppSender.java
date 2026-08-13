@@ -40,11 +40,28 @@ public class WhatsAppSender {
         NotificationProperties.Twilio twilioProps = notificationProperties.getTwilio();
 
         String accountSid = twilioProps.getAccountSid();
+        if (accountSid == null || accountSid.isBlank()) {
+            accountSid = System.getenv("TWILIO_ACCOUNT_SID");
+        }
+
         String authToken = twilioProps.getAuthToken();
+        if (authToken == null || authToken.isBlank()) {
+            authToken = System.getenv("TWILIO_AUTH_TOKEN");
+        }
+
         String fromNumber = twilioProps.getWhatsappFrom();
+        if (fromNumber == null || fromNumber.isBlank()) {
+            fromNumber = System.getenv("TWILIO_WHATSAPP_FROM");
+        }
+        if (fromNumber == null || fromNumber.isBlank()) {
+            fromNumber = "whatsapp:+14155238886";
+        }
 
         if (accountSid == null || accountSid.isBlank() || authToken == null || authToken.isBlank()) {
-            log.info("[WhatsAppSender Mock Dry-Run] To: whatsapp:{}, Body: {}", normalizedPhone, messageBody);
+            log.info("[WhatsAppSender Mock Dry-Run] Credenciales de Twilio no detectadas (accountSidPresent={}, authTokenPresent={}). To: whatsapp:{}, Body: {}",
+                    (accountSid != null && !accountSid.isBlank()),
+                    (authToken != null && !authToken.isBlank()),
+                    normalizedPhone, messageBody);
             String mockSid = "MOCK_WA_" + UUID.randomUUID().toString().substring(0, 8);
             return NotificationSendResult.success(mockSid);
         }
