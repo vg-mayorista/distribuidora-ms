@@ -18,8 +18,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -50,13 +52,16 @@ public class NotificationDispatcher {
         String emailSubject = "📦 Nuevo Pedido Express #" + event.getOrderId().toString().substring(0, 8) + " - VG Mayorista";
         String emailHtml = buildEmailBody(event);
 
+        Set<String> processedPhones = new HashSet<>();
+        Set<String> processedEmails = new HashSet<>();
+
         for (User recipient : recipients) {
-            dispatchWhatsApp(config, recipient, event, waBody);
-            dispatchEmail(config, recipient, event, emailSubject, emailHtml);
+            dispatchWhatsApp(config, recipient, event, waBody, processedPhones);
+            dispatchEmail(config, recipient, event, emailSubject, emailHtml, processedEmails);
         }
     }
 
-    private void dispatchWhatsApp(BusinessConfig config, User recipient, OrderNotificationEvent event, String message) {
+    private void dispatchWhatsApp(BusinessConfig config, User recipient, OrderNotificationEvent event, String message, Set<String> processedPhones) {
         if (!Boolean.TRUE.equals(config.getNotifyWhatsappEnabled())) {
             saveLog(event, recipient, NotificationChannel.WHATSAPP, recipient.getPhone(), NotificationStatus.SKIPPED, "Canal WhatsApp deshabilitado en BusinessConfig", 0);
             return;
@@ -69,6 +74,12 @@ public class NotificationDispatcher {
         }
 
         String phone = phoneOpt.get();
+        if (processedPhones.contains(phone)) {
+            log.info("[NotificationDispatcher] Skipping duplicate WhatsApp phone address {} for order {}", phone, event.getOrderId());
+            return;
+        }
+        processedPhones.add(phone);
+
         try {
             NotificationSendResult result = whatsAppSender.sendWhatsApp(phone, message);
             if (result.isSuccess()) {
@@ -82,7 +93,7 @@ public class NotificationDispatcher {
         }
     }
 
-    private void dispatchEmail(BusinessConfig config, User recipient, OrderNotificationEvent event, String subject, String bodyHtml) {
+    private void dispatchEmail(BusinessConfig config, User recipient, OrderNotificationEvent event, String subject, String bodyHtml, Set<String> processedEmails) {
         if (!Boolean.TRUE.equals(config.getNotifyEmailEnabled())) {
             saveLog(event, recipient, NotificationChannel.EMAIL, recipient.getEmail(), NotificationStatus.SKIPPED, "Canal Email deshabilitado en BusinessConfig", 0);
             return;
@@ -92,6 +103,13 @@ public class NotificationDispatcher {
             saveLog(event, recipient, NotificationChannel.EMAIL, recipient.getEmail(), NotificationStatus.SKIPPED, "Email del usuario no disponible", 0);
             return;
         }
+
+        String email = recipient.getEmail().trim().toLowerCase();
+        if (processedEmails.contains(email)) {
+            log.info("[NotificationDispatcher] Skipping duplicate email address {} for order {}", email, event.getOrderId());
+            return;
+        }
+        processedEmails.add(email);
 
         try {
             NotificationSendResult result = emailSender.sendEmail(recipient.getEmail(), subject, bodyHtml);

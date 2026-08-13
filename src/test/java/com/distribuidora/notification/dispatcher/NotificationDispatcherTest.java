@@ -171,4 +171,34 @@ class NotificationDispatcherTest {
         assertThat(waLog.getStatus()).isEqualTo(NotificationStatus.FAILED);
         assertThat(waLog.getErrorDetails()).contains("Twilio API Error");
     }
+
+    @Test
+    void skippeaDestinatariosConMismoTelefonoOEmail() {
+        User user1 = User.builder()
+                .id(UUID.randomUUID())
+                .firstName("Admin")
+                .email("admin@test.com")
+                .phone("1145678900")
+                .build();
+
+        User user2 = User.builder()
+                .id(UUID.randomUUID())
+                .firstName("Distribuidor")
+                .email("distribuidor@test.com")
+                .phone("1145678900") // Mismo celular que user1
+                .build();
+
+        when(businessConfigService.getOrInitConfig()).thenReturn(defaultConfig);
+        when(recipientResolver.resolveRecipients()).thenReturn(List.of(user1, user2));
+        when(whatsAppSender.sendWhatsApp(anyString(), anyString())).thenReturn(NotificationSendResult.success("WA_123"));
+        when(emailSender.sendEmail(anyString(), anyString(), anyString())).thenReturn(NotificationSendResult.success("MAIL_123"));
+
+        notificationDispatcher.dispatchOrderCreatedNotification(sampleEvent);
+
+        // Se envía EXACTAMENTE 1 solo WhatsApp al celular 1145678900 aunque haya 2 usuarios receptores con ese número
+        verify(whatsAppSender, times(1)).sendWhatsApp(anyString(), anyString());
+
+        // Se envían 2 emails (1 a admin@test.com y 1 a distribuidor@test.com ya que son emails distintos)
+        verify(emailSender, times(2)).sendEmail(anyString(), anyString(), anyString());
+    }
 }
