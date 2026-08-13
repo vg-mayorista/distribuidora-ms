@@ -48,6 +48,25 @@ public class BusinessConfig {
     @Builder.Default
     private BigDecimal minOrderAmount = new BigDecimal("30000.00");
 
+    @Column(name = "notify_roles_csv", length = 500)
+    @Builder.Default
+    private String notifyRolesCsv = "ROLE_ADMIN,ROLE_DISTRIBUTOR";
+
+    @Column(name = "notify_user_ids_csv", length = 1000)
+    private String notifyUserIdsCsv;
+
+    @Column(name = "notify_whatsapp_enabled", nullable = false)
+    @Builder.Default
+    private Boolean notifyWhatsappEnabled = true;
+
+    @Column(name = "notify_email_enabled", nullable = false)
+    @Builder.Default
+    private Boolean notifyEmailEnabled = true;
+
+    @Column(name = "notify_on_stock_order_created", nullable = false)
+    @Builder.Default
+    private Boolean notifyOnStockOrderCreated = true;
+
     @Column(name = "updated_at")
     private Instant updatedAt;
 
@@ -56,11 +75,25 @@ public class BusinessConfig {
         Instant now = Instant.now();
         if (this.minPacksPerLine == null) this.minPacksPerLine = 5;
         if (this.minOrderAmount == null) this.minOrderAmount = new BigDecimal("30000.00");
+        if (this.notifyRolesCsv == null) this.notifyRolesCsv = "ROLE_ADMIN,ROLE_DISTRIBUTOR";
+        if (this.notifyWhatsappEnabled == null) this.notifyWhatsappEnabled = true;
+        if (this.notifyEmailEnabled == null) this.notifyEmailEnabled = true;
+        if (this.notifyOnStockOrderCreated == null) this.notifyOnStockOrderCreated = true;
         this.updatedAt = now;
     }
 
     @PreUpdate
     void onUpdate() {
         this.updatedAt = Instant.now();
+    }
+
+    public java.util.List<String> getNotifyRolesList() {
+        if (notifyRolesCsv == null || notifyRolesCsv.isBlank()) {
+            return java.util.List.of("ROLE_ADMIN", "ROLE_DISTRIBUTOR");
+        }
+        return java.util.Arrays.stream(notifyRolesCsv.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(java.util.stream.Collectors.toList());
     }
 }

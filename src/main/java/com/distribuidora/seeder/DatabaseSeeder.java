@@ -56,6 +56,11 @@ public class DatabaseSeeder implements CommandLineRunner {
   private void ensureSchemaCompatibility() {
     executeQuietly("ALTER TABLE business_config ADD COLUMN min_packs_per_line INTEGER DEFAULT 5");
     executeQuietly("ALTER TABLE business_config ADD COLUMN min_order_amount NUMERIC(12, 2) DEFAULT 30000.00");
+    executeQuietly("ALTER TABLE business_config ADD COLUMN notify_roles_csv VARCHAR(500) DEFAULT 'ROLE_ADMIN,ROLE_DISTRIBUTOR'");
+    executeQuietly("ALTER TABLE business_config ADD COLUMN notify_user_ids_csv VARCHAR(1000)");
+    executeQuietly("ALTER TABLE business_config ADD COLUMN notify_whatsapp_enabled BOOLEAN DEFAULT TRUE");
+    executeQuietly("ALTER TABLE business_config ADD COLUMN notify_email_enabled BOOLEAN DEFAULT TRUE");
+    executeQuietly("ALTER TABLE business_config ADD COLUMN notify_on_stock_order_created BOOLEAN DEFAULT TRUE");
     executeQuietly("ALTER TABLE business_config ADD COLUMN updated_at TIMESTAMP");
 
     executeQuietly("ALTER TABLE delivery_methods ADD COLUMN applies_to_order_type VARCHAR(20) DEFAULT 'BOTH'");
