@@ -44,12 +44,36 @@ public class DatabaseSeeder implements CommandLineRunner {
 
   @Override
   public void run(String... args) {
+    ensureSchemaCompatibility();
     seedRoles();
     seedUsers();
     seedDeliveryMethods();
     seedDeliveryWindows();
     seedCategoriesAndProducts();
     seedBusinessConfig();
+  }
+
+  private void ensureSchemaCompatibility() {
+    executeQuietly("ALTER TABLE business_config ADD COLUMN min_packs_per_line INTEGER DEFAULT 5");
+    executeQuietly("ALTER TABLE business_config ADD COLUMN min_order_amount NUMERIC(12, 2) DEFAULT 30000.00");
+    executeQuietly("ALTER TABLE business_config ADD COLUMN updated_at TIMESTAMP");
+
+    executeQuietly("ALTER TABLE delivery_methods ADD COLUMN applies_to_order_type VARCHAR(20) DEFAULT 'BOTH'");
+
+    executeQuietly("ALTER TABLE orders ADD COLUMN type VARCHAR(20) DEFAULT 'STOCK'");
+    executeQuietly("ALTER TABLE orders ADD COLUMN delivery_date DATE");
+    executeQuietly("ALTER TABLE orders ADD COLUMN stock_decremented BOOLEAN DEFAULT FALSE");
+
+    executeQuietly("ALTER TABLE order_items ADD COLUMN packs_requested INTEGER DEFAULT 0");
+    executeQuietly("ALTER TABLE order_items ADD COLUMN units_per_pack_at_order INTEGER DEFAULT 1");
+  }
+
+  private void executeQuietly(String sql) {
+    try {
+      jdbcTemplate.execute(sql);
+    } catch (Exception ignored) {
+      // Ignorado si la columna ya existe o la tabla aún no se creó
+    }
   }
 
   private void seedBusinessConfig() {
