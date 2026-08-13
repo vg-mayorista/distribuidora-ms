@@ -147,6 +147,13 @@ public class GlobalExceptionHandler {
         return detail;
     }
 
+    @ExceptionHandler(NotificationLogNotFoundException.class)
+    ProblemDetail handleNotificationLogNotFound(NotificationLogNotFoundException ex) {
+        ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        detail.setDetail(ex.getMessage());
+        return detail;
+    }
+
     @ExceptionHandler(OrderNotEditableException.class)
     ProblemDetail handleOrderNotEditable(OrderNotEditableException ex) {
         ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.CONFLICT);

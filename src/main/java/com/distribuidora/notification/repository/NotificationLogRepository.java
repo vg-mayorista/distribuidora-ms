@@ -6,6 +6,8 @@ import com.distribuidora.notification.domain.NotificationStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -21,4 +23,19 @@ public interface NotificationLogRepository extends JpaRepository<NotificationLog
     Page<NotificationLog> findByChannel(NotificationChannel channel, Pageable pageable);
 
     Page<NotificationLog> findByStatusAndChannel(NotificationStatus status, NotificationChannel channel, Pageable pageable);
+
+    @Query("SELECT n FROM NotificationLog n WHERE " +
+           "(:status IS NULL OR n.status = :status) AND " +
+           "(:channel IS NULL OR n.channel = :channel) AND " +
+           "(:orderId IS NULL OR n.orderId = :orderId)")
+    Page<NotificationLog> findByFilters(
+            @Param("status") NotificationStatus status,
+            @Param("channel") NotificationChannel channel,
+            @Param("orderId") UUID orderId,
+            Pageable pageable);
+
+    long countByStatus(NotificationStatus status);
+
+    long countByChannel(NotificationChannel channel);
 }
+
