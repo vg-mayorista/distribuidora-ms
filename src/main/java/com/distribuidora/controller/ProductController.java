@@ -61,7 +61,7 @@ public class ProductController {
     }
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Listar productos activos paginados")
     @ApiResponse(responseCode = "200", description = "Operación exitosa")
     public Page<ProductResponse> list(
@@ -73,7 +73,7 @@ public class ProductController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Buscar productos por nombre (case-insensitive)")
     public Page<ProductResponse> search(
             @AuthenticationPrincipal CustomUserDetails user,
@@ -86,7 +86,7 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Obtener un producto por ID")
     public ProductResponse getById(
             @AuthenticationPrincipal CustomUserDetails user,

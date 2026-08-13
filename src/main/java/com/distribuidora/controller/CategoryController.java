@@ -62,7 +62,7 @@ public class CategoryController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN', 'DISTRIBUTOR')")
+    @PreAuthorize("permitAll()")
     @Operation(
         summary = "Listar categorías",
         description = "Recupera una lista paginada de categorías. Por defecto solo devuelve las activas."
@@ -77,7 +77,7 @@ public class CategoryController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN', 'DISTRIBUTOR')")
+    @PreAuthorize("permitAll()")
     @Operation(
         summary = "Obtener una categoría por ID",
         description = "Recupera los detalles de una categoría activa específica usando su identificador UUID."
