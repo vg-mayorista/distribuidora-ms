@@ -63,6 +63,13 @@ class OrderServiceSplitTest {
     @Mock UserRepository userRepository;
     @Mock BusinessConfigService businessConfigService;
     @Mock DeliveryScheduleService schedule;
+    @Mock org.springframework.context.ApplicationEventPublisher eventPublisher;
+
+    private OrderService buildService() {
+        return new OrderService(orderRepository, productRepository,
+                deliveryMethodRepository, userRepository,
+                businessConfigService, schedule, eventPublisher);
+    }
 
     UUID userId;
     UUID productId;
@@ -115,11 +122,7 @@ class OrderServiceSplitTest {
                 .thenReturn(Optional.of(product));
     }
 
-    private OrderService buildService() {
-        return new OrderService(orderRepository, productRepository,
-                deliveryMethodRepository, userRepository,
-                businessConfigService, schedule);
-    }
+
 
     private CreateOrderRequest.OrderItemRequest item(UUID pid, int packs) {
         return new CreateOrderRequest.OrderItemRequest(pid, packs);

@@ -67,6 +67,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final BusinessConfigService businessConfigService;
     private final DeliveryScheduleService deliveryScheduleService;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     private final Clock clock = Clock.system(ZoneId.of("America/Argentina/Buenos_Aires"));
 
@@ -241,6 +242,25 @@ public class OrderService {
         order.setStockDecremented(Boolean.TRUE);
 
         Order saved = orderRepository.save(order);
+
+        if (eventPublisher != null) {
+            User customer = userRepository.findById(userId).orElse(null);
+            String customerName = customer != null ? customer.getFirstName() + " " + customer.getLastName() : "Cliente";
+            String customerPhone = order.getDeliveryPhone() != null ? order.getDeliveryPhone() : (customer != null ? customer.getPhone() : null);
+
+            eventPublisher.publishEvent(com.distribuidora.notification.event.OrderNotificationEvent.builder()
+                    .orderId(saved.getId())
+                    .orderType(saved.getType())
+                    .customerName(customerName)
+                    .customerPhone(customerPhone)
+                    .deliveryAddress(saved.getDeliveryAddress())
+                    .subtotal(saved.getSubtotal())
+                    .total(saved.getTotal())
+                    .itemsCount(saved.getItems() != null ? saved.getItems().size() : 0)
+                    .createdAt(saved.getCreatedAt())
+                    .build());
+        }
+
         return toResponse(saved);
     }
 
