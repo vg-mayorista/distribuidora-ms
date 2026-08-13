@@ -26,5 +26,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
         @Param("search") String search,
         Pageable pageable
     );
+
+    java.util.List<User> findByRole_NameInAndActiveTrue(java.util.Collection<String> roleNames);
+
+    java.util.List<User> findAllByIdInAndActiveTrue(java.util.Collection<UUID> ids);
 }
 
