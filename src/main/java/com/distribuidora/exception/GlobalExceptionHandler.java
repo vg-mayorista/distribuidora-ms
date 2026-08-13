@@ -205,9 +205,10 @@ public class GlobalExceptionHandler {
         if (ex instanceof org.springframework.web.server.ResponseStatusException) {
             throw ex;
         }
-        log.error("Unhandled RuntimeException in request", ex);
+        log.error("Unhandled RuntimeException in request: {}", ex.getMessage(), ex);
         ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR);
-        detail.setDetail("Error interno del servidor");
+        String msg = ex.getMessage();
+        detail.setDetail(msg != null && !msg.isBlank() ? "Error interno del servidor: " + msg : "Error interno del servidor");
         return detail;
     }
 }
