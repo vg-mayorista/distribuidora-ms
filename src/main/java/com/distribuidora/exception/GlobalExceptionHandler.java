@@ -10,6 +10,12 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.distribuidora.deliverynote.exception.DeliveryNoteInvalidTransitionException;
+import com.distribuidora.deliverynote.exception.DeliveryNoteNotFoundException;
+import com.distribuidora.deliverynote.exception.DeliveryNoteOrderInvalidStatusException;
+import com.distribuidora.deliverynote.exception.DeliveryNoteOrderNotWholesaleException;
+import com.distribuidora.deliverynote.exception.DeliveryNoteDownloadNotAvailableException;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -216,6 +222,45 @@ public class GlobalExceptionHandler {
         ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR);
         String msg = ex.getMessage();
         detail.setDetail(msg != null && !msg.isBlank() ? "Error interno del servidor: " + msg : "Error interno del servidor");
+        return detail;
+    }
+
+    @ExceptionHandler(DeliveryNoteNotFoundException.class)
+    ProblemDetail handleDeliveryNoteNotFound(DeliveryNoteNotFoundException ex) {
+        ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        detail.setDetail(ex.getMessage());
+        return detail;
+    }
+
+    @ExceptionHandler(DeliveryNoteInvalidTransitionException.class)
+    ProblemDetail handleDeliveryNoteInvalidTransition(DeliveryNoteInvalidTransitionException ex) {
+        ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        detail.setDetail(ex.getMessage());
+        detail.setProperty("error", "DELIVERY_NOTE_INVALID_TRANSITION");
+        return detail;
+    }
+
+    @ExceptionHandler(DeliveryNoteOrderNotWholesaleException.class)
+    ProblemDetail handleDeliveryNoteOrderNotWholesale(DeliveryNoteOrderNotWholesaleException ex) {
+        ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        detail.setDetail(ex.getMessage());
+        detail.setProperty("error", "DELIVERY_NOTE_ORDER_NOT_WHOLESALE");
+        return detail;
+    }
+
+    @ExceptionHandler(DeliveryNoteOrderInvalidStatusException.class)
+    ProblemDetail handleDeliveryNoteOrderInvalidStatus(DeliveryNoteOrderInvalidStatusException ex) {
+        ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        detail.setDetail(ex.getMessage());
+        detail.setProperty("error", "DELIVERY_NOTE_ORDER_INVALID_STATUS");
+        return detail;
+    }
+
+    @ExceptionHandler(DeliveryNoteDownloadNotAvailableException.class)
+    ProblemDetail handleDeliveryNoteDownloadNotAvailable(DeliveryNoteDownloadNotAvailableException ex) {
+        ProblemDetail detail = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        detail.setDetail(ex.getMessage());
+        detail.setProperty("error", "DELIVERY_NOTE_DOWNLOAD_NOT_AVAILABLE");
         return detail;
     }
 }
