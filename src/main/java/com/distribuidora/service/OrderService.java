@@ -28,6 +28,7 @@ import com.distribuidora.repository.DeliveryMethodRepository;
 import com.distribuidora.repository.OrderRepository;
 import com.distribuidora.repository.ProductRepository;
 import com.distribuidora.repository.UserRepository;
+import com.distribuidora.deliverynote.service.DeliveryNoteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -68,6 +69,7 @@ public class OrderService {
     private final BusinessConfigService businessConfigService;
     private final DeliveryScheduleService deliveryScheduleService;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
+    private final DeliveryNoteService deliveryNoteService;
 
     private final Clock clock = Clock.system(ZoneId.of("America/Argentina/Buenos_Aires"));
 
@@ -447,6 +449,16 @@ public class OrderService {
                     : existing + "\n— " + extraNotes);
         }
         order.setStatus(target);
+
+        if (target == OrderStatus.ARMADO && order.getType() == OrderType.WHOLESALE) {
+            try {
+                deliveryNoteService.generateFromOrder(order.getId());
+            } catch (IllegalStateException ex) {
+                eventPublisher.publishEvent(new com.distribuidora.deliverynote.event.DeliveryNoteCreatedEvent(
+                        java.util.UUID.randomUUID(), "N/A", order.getUserId()));
+            }
+        }
+
         return toResponse(order);
     }
 

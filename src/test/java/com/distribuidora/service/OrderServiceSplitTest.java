@@ -23,6 +23,7 @@ import com.distribuidora.repository.DeliveryMethodRepository;
 import com.distribuidora.repository.OrderRepository;
 import com.distribuidora.repository.ProductRepository;
 import com.distribuidora.repository.UserRepository;
+import com.distribuidora.deliverynote.service.DeliveryNoteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -64,11 +65,13 @@ class OrderServiceSplitTest {
     @Mock BusinessConfigService businessConfigService;
     @Mock DeliveryScheduleService schedule;
     @Mock org.springframework.context.ApplicationEventPublisher eventPublisher;
+    @Mock DeliveryNoteService deliveryNoteService;
 
     private OrderService buildService() {
         return new OrderService(orderRepository, productRepository,
                 deliveryMethodRepository, userRepository,
-                businessConfigService, schedule, eventPublisher);
+                businessConfigService, schedule, eventPublisher,
+                deliveryNoteService);
     }
 
     UUID userId;
