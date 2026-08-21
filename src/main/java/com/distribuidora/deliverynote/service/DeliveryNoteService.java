@@ -71,8 +71,7 @@ public class DeliveryNoteService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
-        if (order.getStatus() != com.distribuidora.model.OrderStatus.ARMADO
-                && order.getStatus() != com.distribuidora.model.OrderStatus.ENVIADO) {
+        if (order.getStatus() != com.distribuidora.model.OrderStatus.ARMADO) {
             throw new DeliveryNoteOrderInvalidStatusException(order.getId(), order.getStatus());
         }
 
@@ -81,6 +80,10 @@ public class DeliveryNoteService {
         }
 
         int year = LocalDate.now(clock).getYear();
+        if (deliveryNoteRepository.findByOrderId(order.getId(), org.springframework.data.domain.Pageable.unpaged()).hasContent()) {
+            throw new IllegalStateException("Ya existe un remito para el pedido " + order.getId());
+        }
+
         DeliveryNote deliveryNote = DeliveryNote.builder()
                 .orderId(order.getId())
                 .deliveryNoteNumber(generateNextNumber(year))
