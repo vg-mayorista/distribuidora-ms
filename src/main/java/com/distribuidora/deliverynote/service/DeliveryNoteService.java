@@ -79,6 +79,7 @@ public class DeliveryNoteService {
             throw new DeliveryNoteOrderNotWholesaleException(order.getId(), order.getType());
         }
 
+
         int year = LocalDate.now(clock).getYear();
         Page<DeliveryNote> existingNotes = deliveryNoteRepository.findByOrderId(order.getId(), org.springframework.data.domain.Pageable.unpaged());
         if (existingNotes != null && existingNotes.hasContent()) {
