@@ -1,8 +1,8 @@
 package com.distribuidora.deliverynote.service;
 
-import com.distribuidora.dto.deliverynote.CreateDeliveryNoteRequest;
-import com.distribuidora.dto.deliverynote.DeliveryNoteItemResponse;
-import com.distribuidora.dto.deliverynote.DeliveryNoteResponse;
+import com.distribuidora.deliverynote.dto.CreateDeliveryNoteRequest;
+import com.distribuidora.deliverynote.dto.DeliveryNoteItemResponse;
+import com.distribuidora.deliverynote.dto.DeliveryNoteResponse;
 import com.distribuidora.deliverynote.exception.DeliveryNoteInvalidTransitionException;
 import com.distribuidora.deliverynote.exception.DeliveryNoteNotFoundException;
 import com.distribuidora.deliverynote.exception.DeliveryNoteOrderInvalidStatusException;
@@ -80,7 +80,8 @@ public class DeliveryNoteService {
         }
 
         int year = LocalDate.now(clock).getYear();
-        if (deliveryNoteRepository.findByOrderId(order.getId(), org.springframework.data.domain.Pageable.unpaged()).hasContent()) {
+        Page<DeliveryNote> existingNotes = deliveryNoteRepository.findByOrderId(order.getId(), org.springframework.data.domain.Pageable.unpaged());
+        if (existingNotes != null && existingNotes.hasContent()) {
             throw new IllegalStateException("Ya existe un remito para el pedido " + order.getId());
         }
 

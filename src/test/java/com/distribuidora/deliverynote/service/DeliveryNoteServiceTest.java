@@ -1,7 +1,7 @@
 package com.distribuidora.deliverynote.service;
 
-import com.distribuidora.dto.deliverynote.DeliveryNoteItemResponse;
-import com.distribuidora.dto.deliverynote.DeliveryNoteResponse;
+import com.distribuidora.deliverynote.dto.DeliveryNoteItemResponse;
+import com.distribuidora.deliverynote.dto.DeliveryNoteResponse;
 import com.distribuidora.exception.OrderNotFoundException;
 import com.distribuidora.model.Order;
 import com.distribuidora.model.OrderItem;
@@ -122,6 +122,7 @@ class DeliveryNoteServiceTest {
         void createsDeliveryNoteFromArmadoWholesaleOrder() {
             Order order = armadoWholesaleOrder();
             when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+            when(deliveryNoteRepository.findByOrderId(any(), any())).thenReturn(Page.empty());
             when(deliveryNoteRepository.findMaxDeliveryNoteNumberForYear(2026)).thenReturn(Optional.empty());
             when(deliveryNoteRepository.save(any(DeliveryNote.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -192,6 +193,7 @@ class DeliveryNoteServiceTest {
         void generatesFirstNumberWhenNoExistingNoteForYear() {
             Order order = armadoWholesaleOrder();
             when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+            when(deliveryNoteRepository.findByOrderId(any(), any())).thenReturn(Page.empty());
             when(deliveryNoteRepository.findMaxDeliveryNoteNumberForYear(2026)).thenReturn(Optional.empty());
             when(deliveryNoteRepository.save(any(DeliveryNote.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -204,6 +206,7 @@ class DeliveryNoteServiceTest {
         void incrementsNumberFromExistingMax() {
             Order order = armadoWholesaleOrder();
             when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+            when(deliveryNoteRepository.findByOrderId(any(), any())).thenReturn(Page.empty());
             when(deliveryNoteRepository.findMaxDeliveryNoteNumberForYear(2026)).thenReturn(Optional.of("R-2026-0005"));
             when(deliveryNoteRepository.save(any(DeliveryNote.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -216,6 +219,7 @@ class DeliveryNoteServiceTest {
         void publishesDeliveryNoteCreatedEvent() {
             Order order = armadoWholesaleOrder();
             when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+            when(deliveryNoteRepository.findByOrderId(any(), any())).thenReturn(Page.empty());
             when(deliveryNoteRepository.findMaxDeliveryNoteNumberForYear(2026)).thenReturn(Optional.empty());
             when(deliveryNoteRepository.save(any(DeliveryNote.class))).thenAnswer(inv -> {
                 DeliveryNote dn = inv.getArgument(0);
