@@ -1,7 +1,7 @@
-package com.distribuidora.controller;
+package com.distribuidora.deliverynote.controller;
 
-import com.distribuidora.dto.deliverynote.DeliveryNoteResponse;
-import com.distribuidora.dto.deliverynote.UpdateDeliveryNoteStatusRequest;
+import com.distribuidora.deliverynote.dto.DeliveryNoteResponse;
+import com.distribuidora.deliverynote.dto.UpdateDeliveryNoteStatusRequest;
 import com.distribuidora.deliverynote.model.DeliveryNoteStatus;
 import com.distribuidora.deliverynote.service.DeliveryNoteDocxService;
 import com.distribuidora.deliverynote.service.DeliveryNoteService;

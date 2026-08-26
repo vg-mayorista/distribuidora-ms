@@ -5,6 +5,7 @@
 | ConflictingBeanDefinitionException al arrancar | `conflicting-bean-definition.md` |
 | No aparece opción de descargar remito para rol distribuidor | `missing-distributor-remitos.md` |
 | Test unitario de OrderService no compila por constructor desactualizado | `test-order-service-missing-dependency.md` |
+| Fallo en el Build de Docker/Render por paquete desalineado en controladores | `render-build-import-package-mismatch.md` |
 
 > **Nota**: El error frontend de remitos está documentado en `D:\programacion\distribuidora-ui\docs\errors\missing-remitos-frontend.md`.
 
