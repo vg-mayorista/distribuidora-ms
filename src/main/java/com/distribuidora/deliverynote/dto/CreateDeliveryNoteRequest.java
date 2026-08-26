@@ -1,4 +1,4 @@
-package com.distribuidora.dto.deliverynote;
+package com.distribuidora.deliverynote.dto;
 
 import java.util.List;
 import java.util.UUID;

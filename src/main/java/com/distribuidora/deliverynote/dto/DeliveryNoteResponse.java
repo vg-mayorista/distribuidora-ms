@@ -1,4 +1,4 @@
-package com.distribuidora.dto.deliverynote;
+package com.distribuidora.deliverynote.dto;
 
 import com.distribuidora.deliverynote.model.DeliveryNoteStatus;
 

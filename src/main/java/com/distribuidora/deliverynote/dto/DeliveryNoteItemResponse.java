@@ -1,4 +1,4 @@
-package com.distribuidora.dto.deliverynote;
+package com.distribuidora.deliverynote.dto;
 
 import java.math.BigDecimal;
 import java.util.UUID;
