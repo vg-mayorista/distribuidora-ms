@@ -24,6 +24,7 @@ public record OrderResponse(
         String deliveryAddress,
         String deliveryPhone,
         String notes,
+        com.distribuidora.model.PaymentMethod paymentMethod,
         LocalDate deliveryDate,
         Boolean editable,
         Integer itemCount,

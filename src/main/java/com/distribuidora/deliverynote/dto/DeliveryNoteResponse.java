@@ -14,6 +14,7 @@ public record DeliveryNoteResponse(
         DeliveryNoteStatus status,
         LocalDate issueDate,
         LocalDate deliveryDate,
+        com.distribuidora.model.PaymentMethod paymentMethod,
         String notes,
         List<DeliveryNoteItemResponse> items,
         Instant createdAt,

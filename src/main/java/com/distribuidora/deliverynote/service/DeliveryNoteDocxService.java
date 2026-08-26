@@ -106,6 +106,15 @@ public class DeliveryNoteDocxService {
                 replaceUnderscores(paragraph, notes);
             } else if (text.contains("Firma y Aclaraci") && text.contains("del Cliente:")) {
                 replaceUnderscores(paragraph, "");
+            } else if (text.contains("FORMA DE PAGO")) {
+                com.distribuidora.model.PaymentMethod pm = dn.getPaymentMethod() != null
+                        ? dn.getPaymentMethod()
+                        : order.getPaymentMethod();
+                boolean isTransfer = (pm == com.distribuidora.model.PaymentMethod.TRANSFERENCIA);
+                String replacement = isTransfer
+                        ? "[   ]          TRANSFERENCIA [ X ]"
+                        : "[ X ]          TRANSFERENCIA [   ]";
+                replaceUnderscores(paragraph, replacement);
             }
         }
     }

@@ -31,11 +31,17 @@ public record CreateOrderRequest(
         @Size(max = 1000)
         String notes,
 
+        com.distribuidora.model.PaymentMethod paymentMethod,
+
         @NotNull
         @NotEmpty
         @Valid
         List<OrderItemRequest> items
 ) {
+    public CreateOrderRequest(UUID deliveryMethodId, LocalDate deliveryDate, String deliveryAddress, String deliveryPhone, String notes, List<OrderItemRequest> items) {
+        this(deliveryMethodId, deliveryDate, deliveryAddress, deliveryPhone, notes, com.distribuidora.model.PaymentMethod.EFECTIVO, items);
+    }
+
     public record OrderItemRequest(
             @NotNull
             UUID productId,

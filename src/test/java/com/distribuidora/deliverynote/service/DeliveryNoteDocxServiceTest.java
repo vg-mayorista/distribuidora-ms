@@ -83,6 +83,7 @@ class DeliveryNoteDocxServiceTest {
                 .issueDate(LocalDate.of(2026, 8, 20))
                 .deliveryDate(LocalDate.of(2026, 8, 25))
                 .notes("Nota de prueba")
+                .paymentMethod(com.distribuidora.model.PaymentMethod.TRANSFERENCIA)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .items(List.of(
@@ -166,6 +167,7 @@ class DeliveryNoteDocxServiceTest {
         assertThat(paragraphs).anySatisfy(text -> assertThat(text).contains("R-2026-0001"));
         assertThat(paragraphs).anySatisfy(text -> assertThat(text).contains("25/08/2026"));
         assertThat(paragraphs).anySatisfy(text -> assertThat(text).contains("Nota de prueba"));
+        assertThat(paragraphs).anySatisfy(text -> assertThat(text).contains("TRANSFERENCIA [ X ]"));
 
         List<String> cells = getAllCellTexts(docx);
         assertThat(cells).anySatisfy(text -> assertThat(text).contains("Yerba Mate"));

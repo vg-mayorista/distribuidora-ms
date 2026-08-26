@@ -147,6 +147,7 @@ public class OrderService {
                 .deliveryAddress(req.deliveryAddress())
                 .deliveryPhone(req.deliveryPhone())
                 .notes(req.notes())
+                .paymentMethod(req.paymentMethod() != null ? req.paymentMethod() : com.distribuidora.model.PaymentMethod.EFECTIVO)
                 .deliveryDate(req.deliveryDate())
                 .stockDecremented(Boolean.FALSE)
                 .build();
@@ -209,6 +210,7 @@ public class OrderService {
                 .deliveryAddress(req.deliveryAddress())
                 .deliveryPhone(req.deliveryPhone())
                 .notes(req.notes())
+                .paymentMethod(req.paymentMethod() != null ? req.paymentMethod() : com.distribuidora.model.PaymentMethod.EFECTIVO)
                 .deliveryDate(null)
                 .stockDecremented(Boolean.FALSE)
                 .build();
@@ -313,6 +315,7 @@ public class OrderService {
         if (req.deliveryAddress() != null) order.setDeliveryAddress(req.deliveryAddress());
         if (req.deliveryPhone() != null) order.setDeliveryPhone(req.deliveryPhone());
         if (req.notes() != null) order.setNotes(req.notes());
+        if (req.paymentMethod() != null) order.setPaymentMethod(req.paymentMethod());
 
         BigDecimal total = subtotal.add(order.getDeliveryCost());
         order.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
@@ -380,6 +383,7 @@ public class OrderService {
         if (req.deliveryAddress() != null) order.setDeliveryAddress(req.deliveryAddress());
         if (req.deliveryPhone() != null) order.setDeliveryPhone(req.deliveryPhone());
         if (req.notes() != null) order.setNotes(req.notes());
+        if (req.paymentMethod() != null) order.setPaymentMethod(req.paymentMethod());
 
         BigDecimal total = subtotal.add(order.getDeliveryCost());
         order.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
@@ -748,6 +752,7 @@ public class OrderService {
                 order.getDeliveryAddress(),
                 order.getDeliveryPhone(),
                 order.getNotes(),
+                order.getPaymentMethod(),
                 dateValue,
                 editable,
                 order.getItems().size(),

@@ -24,11 +24,17 @@ public record UpdateOrderRequest(
         @Size(max = 1000)
         String notes,
 
+        com.distribuidora.model.PaymentMethod paymentMethod,
+
         @NotNull
         @NotEmpty
         @Valid
         List<OrderItemRequest> items
 ) {
+    public UpdateOrderRequest(UUID deliveryMethodId, LocalDate deliveryDate, String deliveryAddress, String deliveryPhone, String notes, List<OrderItemRequest> items) {
+        this(deliveryMethodId, deliveryDate, deliveryAddress, deliveryPhone, notes, null, items);
+    }
+
     public record OrderItemRequest(
             @NotNull
             UUID productId,

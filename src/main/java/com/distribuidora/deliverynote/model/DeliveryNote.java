@@ -48,6 +48,10 @@ public class DeliveryNote {
     @Builder.Default
     private DeliveryNoteStatus status = DeliveryNoteStatus.PENDING;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", length = 20)
+    private com.distribuidora.model.PaymentMethod paymentMethod;
+
     @Column(name = "issue_date")
     private LocalDate issueDate;
 

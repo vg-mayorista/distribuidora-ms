@@ -90,6 +90,7 @@ public class DeliveryNoteService {
                 .orderId(order.getId())
                 .deliveryNoteNumber(generateNextNumber(year))
                 .status(DeliveryNoteStatus.PENDING)
+                .paymentMethod(order.getPaymentMethod())
                 .issueDate(LocalDate.now(clock))
                 .deliveryDate(order.getDeliveryDate())
                 .notes("Generado desde pedido " + orderId)
@@ -180,6 +181,7 @@ public class DeliveryNoteService {
                 dn.getStatus(),
                 dn.getIssueDate(),
                 dn.getDeliveryDate(),
+                dn.getPaymentMethod(),
                 dn.getNotes(),
                 itemResponses,
                 dn.getCreatedAt(),
