@@ -26,7 +26,7 @@ public record UpdateOrderRequest(
 
         com.distribuidora.model.PaymentMethod paymentMethod,
 
-        @Size(max = 2000)
+        @Size(max = 10000000)
         String paymentReceiptUrl,
 
         @NotNull

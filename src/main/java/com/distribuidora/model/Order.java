@@ -86,7 +86,7 @@ public class Order {
     @Column(length = 1000)
     private String notes;
 
-    @Column(name = "payment_receipt_url", length = 2000)
+    @Column(name = "payment_receipt_url", columnDefinition = "TEXT")
     private String paymentReceiptUrl;
 
     @Column(name = "delivery_date")
