@@ -17,6 +17,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -87,5 +88,15 @@ public class DistributorOrderController {
                 ? java.time.LocalDate.parse(body.get("deliveryDate"))
                 : null;
         return orderService.updateDeliveryDate(id, date);
+    }
+
+    @PostMapping("/cancel-expired-pickups")
+    @Operation(summary = "Desintegrar / Cancelar todos los pedidos de retiro en local vencidos (>24hs)")
+    public java.util.Map<String, Object> cancelExpiredPickups() {
+        int count = orderService.cancelAllExpiredPickupOrders();
+        return java.util.Map.of(
+            "cancelledCount", count,
+            "message", "Se desintegraron " + count + " pedidos de retiro vencidos exitosamente."
+        );
     }
 }

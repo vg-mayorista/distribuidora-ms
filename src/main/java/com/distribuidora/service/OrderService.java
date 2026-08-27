@@ -513,6 +513,22 @@ public class OrderService {
         return order;
     }
 
+    @Transactional
+    public int cancelAllExpiredPickupOrders() {
+        java.time.Instant cutoffTime = java.time.Instant.now().minus(24, java.time.temporal.ChronoUnit.HOURS);
+        List<Order> expired = orderRepository.findAll().stream()
+                .filter(o -> o.getStatus() == OrderStatus.PENDIENTE || o.getStatus() == OrderStatus.ARMADO)
+                .filter(o -> o.getDeliveryMethodName() != null &&
+                        (o.getDeliveryMethodName().toLowerCase().contains("retiro") || o.getDeliveryMethodName().toLowerCase().contains("local")))
+                .filter(o -> o.getCreatedAt() != null && o.getCreatedAt().isBefore(cutoffTime))
+                .toList();
+
+        for (Order o : expired) {
+            transitionInternal(o, OrderStatus.CANCELADO, "Desintegración automática: Plazo de retiro en local vencido (24hs)");
+        }
+        return expired.size();
+    }
+
     private void decrementStockForOrder(Order order) {
         for (OrderItem item : order.getItems()) {
             Product p = productRepository.findById(item.getProductId())
