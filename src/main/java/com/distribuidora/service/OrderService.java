@@ -148,6 +148,7 @@ public class OrderService {
                 .deliveryPhone(req.deliveryPhone())
                 .notes(req.notes())
                 .paymentMethod(req.paymentMethod() != null ? req.paymentMethod() : com.distribuidora.model.PaymentMethod.EFECTIVO)
+                .paymentReceiptUrl(req.paymentReceiptUrl())
                 .deliveryDate(req.deliveryDate())
                 .stockDecremented(Boolean.FALSE)
                 .build();
@@ -211,6 +212,7 @@ public class OrderService {
                 .deliveryPhone(req.deliveryPhone())
                 .notes(req.notes())
                 .paymentMethod(req.paymentMethod() != null ? req.paymentMethod() : com.distribuidora.model.PaymentMethod.EFECTIVO)
+                .paymentReceiptUrl(req.paymentReceiptUrl())
                 .deliveryDate(null)
                 .stockDecremented(Boolean.FALSE)
                 .build();
@@ -316,6 +318,7 @@ public class OrderService {
         if (req.deliveryPhone() != null) order.setDeliveryPhone(req.deliveryPhone());
         if (req.notes() != null) order.setNotes(req.notes());
         if (req.paymentMethod() != null) order.setPaymentMethod(req.paymentMethod());
+        if (req.paymentReceiptUrl() != null) order.setPaymentReceiptUrl(req.paymentReceiptUrl());
 
         BigDecimal total = subtotal.add(order.getDeliveryCost());
         order.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
@@ -384,6 +387,7 @@ public class OrderService {
         if (req.deliveryPhone() != null) order.setDeliveryPhone(req.deliveryPhone());
         if (req.notes() != null) order.setNotes(req.notes());
         if (req.paymentMethod() != null) order.setPaymentMethod(req.paymentMethod());
+        if (req.paymentReceiptUrl() != null) order.setPaymentReceiptUrl(req.paymentReceiptUrl());
 
         BigDecimal total = subtotal.add(order.getDeliveryCost());
         order.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
@@ -493,6 +497,13 @@ public class OrderService {
     }
 
     // ── Stock helpers ──────────────────────────────────────────────────
+
+    public OrderResponse uploadReceipt(UUID userId, UUID orderId, String receiptUrl) {
+        Order order = loadMineOrThrow(userId, orderId);
+        order.setPaymentReceiptUrl(receiptUrl);
+        Order saved = orderRepository.save(order);
+        return toResponse(saved);
+    }
 
     private void decrementStockForOrder(Order order) {
         for (OrderItem item : order.getItems()) {
@@ -753,6 +764,7 @@ public class OrderService {
                 order.getDeliveryPhone(),
                 order.getNotes(),
                 order.getPaymentMethod(),
+                order.getPaymentReceiptUrl(),
                 dateValue,
                 editable,
                 order.getItems().size(),

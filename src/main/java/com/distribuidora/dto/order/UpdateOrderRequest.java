@@ -26,13 +26,20 @@ public record UpdateOrderRequest(
 
         com.distribuidora.model.PaymentMethod paymentMethod,
 
+        @Size(max = 2000)
+        String paymentReceiptUrl,
+
         @NotNull
         @NotEmpty
         @Valid
         List<OrderItemRequest> items
 ) {
     public UpdateOrderRequest(UUID deliveryMethodId, LocalDate deliveryDate, String deliveryAddress, String deliveryPhone, String notes, List<OrderItemRequest> items) {
-        this(deliveryMethodId, deliveryDate, deliveryAddress, deliveryPhone, notes, null, items);
+        this(deliveryMethodId, deliveryDate, deliveryAddress, deliveryPhone, notes, null, null, items);
+    }
+
+    public UpdateOrderRequest(UUID deliveryMethodId, LocalDate deliveryDate, String deliveryAddress, String deliveryPhone, String notes, com.distribuidora.model.PaymentMethod paymentMethod, List<OrderItemRequest> items) {
+        this(deliveryMethodId, deliveryDate, deliveryAddress, deliveryPhone, notes, paymentMethod, null, items);
     }
 
     public record OrderItemRequest(

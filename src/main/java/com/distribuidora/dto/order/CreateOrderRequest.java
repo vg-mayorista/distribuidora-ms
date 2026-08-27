@@ -33,13 +33,20 @@ public record CreateOrderRequest(
 
         com.distribuidora.model.PaymentMethod paymentMethod,
 
+        @Size(max = 2000)
+        String paymentReceiptUrl,
+
         @NotNull
         @NotEmpty
         @Valid
         List<OrderItemRequest> items
 ) {
     public CreateOrderRequest(UUID deliveryMethodId, LocalDate deliveryDate, String deliveryAddress, String deliveryPhone, String notes, List<OrderItemRequest> items) {
-        this(deliveryMethodId, deliveryDate, deliveryAddress, deliveryPhone, notes, com.distribuidora.model.PaymentMethod.EFECTIVO, items);
+        this(deliveryMethodId, deliveryDate, deliveryAddress, deliveryPhone, notes, com.distribuidora.model.PaymentMethod.EFECTIVO, null, items);
+    }
+
+    public CreateOrderRequest(UUID deliveryMethodId, LocalDate deliveryDate, String deliveryAddress, String deliveryPhone, String notes, com.distribuidora.model.PaymentMethod paymentMethod, List<OrderItemRequest> items) {
+        this(deliveryMethodId, deliveryDate, deliveryAddress, deliveryPhone, notes, paymentMethod, null, items);
     }
 
     public record OrderItemRequest(

@@ -107,4 +107,15 @@ public class OrderController {
             @PathVariable UUID id) {
         return orderService.cancelMine(user.getUser().getId(), id);
     }
+
+    public record UploadReceiptRequest(String receiptUrl) {}
+
+    @PostMapping("/{id}/receipt")
+    @Operation(summary = "Adjuntar comprobante de pago por transferencia")
+    public OrderResponse uploadReceipt(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @PathVariable UUID id,
+            @RequestBody UploadReceiptRequest req) {
+        return orderService.uploadReceipt(user.getUser().getId(), id, req != null ? req.receiptUrl() : null);
+    }
 }
