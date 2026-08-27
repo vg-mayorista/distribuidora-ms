@@ -505,6 +505,14 @@ public class OrderService {
         return toResponse(saved);
     }
 
+    private Order loadMineOrThrow(UUID userId, UUID orderId) {
+        Order order = loadOrThrow(orderId);
+        if (!order.getUserId().equals(userId)) {
+            throw new OrderNotFoundException(orderId);
+        }
+        return order;
+    }
+
     private void decrementStockForOrder(Order order) {
         for (OrderItem item : order.getItems()) {
             Product p = productRepository.findById(item.getProductId())
