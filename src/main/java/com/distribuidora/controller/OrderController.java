@@ -108,7 +108,10 @@ public class OrderController {
         return orderService.cancelMine(user.getUser().getId(), id);
     }
 
-    public record UploadReceiptRequest(String receiptUrl) {}
+    public record UploadReceiptRequest(
+            @jakarta.validation.constraints.Size(max = 10000000)
+            String receiptUrl
+    ) {}
 
     @PostMapping("/{id}/receipt")
     @Operation(summary = "Adjuntar comprobante de pago por transferencia")
